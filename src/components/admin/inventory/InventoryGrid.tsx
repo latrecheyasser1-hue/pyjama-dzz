@@ -612,24 +612,24 @@ export default function InventoryGrid({
                           return (
                             <div
                               key={colorName}
-                              className="bg-pyjama-cream/40 p-3 rounded-2xl border border-gray-100 space-y-2.5"
+                              className="bg-pyjama-cream/50 p-3.5 rounded-2xl border border-gray-200/80 space-y-3"
                             >
-                              {/* Color Title with Small Dynamic Color Circle Badge */}
+                              {/* Color Title with Dynamic Color Swatch Circle */}
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
                                   <span
-                                    className="w-4 h-4 rounded-full border border-gray-300 shadow-xs shrink-0"
+                                    className="w-5 h-5 rounded-full border border-gray-300 shadow-sm shrink-0"
                                     style={{ backgroundColor: hexColorVal }}
                                     title={`درجة اللون: ${colorName}`}
                                   />
-                                  <span className="text-xs font-bold text-pyjama-charcoal">
+                                  <span className="text-xs font-black text-gray-900 tracking-wide">
                                     {colorName}
                                   </span>
                                 </div>
                               </div>
 
                               {/* Size Stock Chips Sorted Strictly Ascending (من الأصغر للأكبر) */}
-                              <div className="flex flex-wrap gap-1.5">
+                              <div className="flex flex-wrap gap-2">
                                 {sortedColorVars.map((v) => {
                                   const stockQty =
                                     activeStockTab === 'DELIVERY'
@@ -641,19 +641,17 @@ export default function InventoryGrid({
                                   return (
                                     <div
                                       key={v.id}
-                                      className={`px-2 py-1 rounded-xl text-[10px] font-mono font-bold border flex items-center gap-1.5 transition-all ${
+                                      className={`px-3 py-1.5 rounded-2xl text-xs font-mono font-bold border flex items-center gap-2 transition-all shadow-xs ${
                                         stockQty > 0
-                                          ? 'bg-white text-pyjama-charcoal border-gray-200 shadow-xs'
-                                          : 'bg-rose-50 text-rose-500 border-rose-100 opacity-75'
+                                          ? 'bg-white text-gray-900 border-gray-300 shadow-xs'
+                                          : 'bg-rose-50/80 text-rose-700 border-rose-200 opacity-90'
                                       }`}
                                     >
-                                      <span className="font-bold">{v.size}:</span>
-
                                       {/* Decrease Stock Button */}
                                       <button
                                         type="button"
                                         onClick={(e) => handleStockChange(v.id, stockQty, -1, e)}
-                                        className="w-4 h-4 rounded bg-gray-100 hover:bg-[#8A2B43] hover:text-white text-gray-700 font-bold flex items-center justify-center text-[10px] transition-colors shrink-0"
+                                        className="w-5 h-5 rounded-lg bg-gray-100 hover:bg-[#8A2B43] hover:text-white text-gray-800 font-black flex items-center justify-center text-xs transition-all shrink-0 active:scale-95 border border-gray-200/80"
                                         title="إنقاص الكمية -1"
                                       >
                                         -
@@ -662,8 +660,8 @@ export default function InventoryGrid({
                                       <span
                                         className={
                                           stockQty > 0
-                                            ? 'text-[#8A2B43] font-black px-0.5'
-                                            : 'text-rose-500 font-black px-0.5'
+                                            ? 'text-[#8A2B43] font-black text-xs min-w-[14px] text-center'
+                                            : 'text-rose-600 font-black text-xs min-w-[14px] text-center'
                                         }
                                       >
                                         {stockQty}
@@ -673,11 +671,15 @@ export default function InventoryGrid({
                                       <button
                                         type="button"
                                         onClick={(e) => handleStockChange(v.id, stockQty, 1, e)}
-                                        className="w-4 h-4 rounded bg-gray-100 hover:bg-[#8A2B43] hover:text-white text-gray-700 font-bold flex items-center justify-center text-[10px] transition-colors shrink-0"
+                                        className="w-5 h-5 rounded-lg bg-gray-100 hover:bg-[#8A2B43] hover:text-white text-gray-800 font-black flex items-center justify-center text-xs transition-all shrink-0 active:scale-95 border border-gray-200/80"
                                         title="زيادة الكمية +1"
                                       >
                                         +
                                       </button>
+
+                                      <span className="font-black text-gray-900 text-xs dir-ltr" dir="ltr">
+                                        :{v.size}
+                                      </span>
                                     </div>
                                   );
                                 })}
