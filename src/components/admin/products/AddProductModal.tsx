@@ -543,15 +543,32 @@ export default function AddProductModal({
         });
 
         if (variantRows.length > 0) {
-          const { error: variantError } = await supabase
+          let { error: variantError } = await supabase
             .from('product_variants')
             .insert(variantRows);
 
+          // Fallback if schema does not have optional columns yet
           if (variantError) {
-            console.error('Variants Update Insert Error:', variantError);
-            alert('خطأ في حفظ متغيرات المنتج: ' + (variantError.message || JSON.stringify(variantError)));
-            setIsSubmitting(false);
-            return;
+            console.warn('First variant insert attempt notice, trying fallback core fields:', variantError.message);
+            const fallbackRows = variantRows.map((r) => ({
+              product_id: r.product_id,
+              color_name: r.color_name,
+              size: r.size,
+              delivery_stock: r.delivery_stock,
+              store_stock: r.store_stock,
+              wholesale_stock: r.wholesale_stock,
+            }));
+
+            const { error: fallbackError } = await supabase
+              .from('product_variants')
+              .insert(fallbackRows);
+
+            if (fallbackError) {
+              console.error('Variants Update Insert Error:', fallbackError);
+              alert('خطأ في حفظ متغيرات المنتج: ' + (fallbackError.message || JSON.stringify(fallbackError)));
+              setIsSubmitting(false);
+              return;
+            }
           }
         }
 
@@ -622,15 +639,32 @@ export default function AddProductModal({
           });
 
           if (variantRows.length > 0) {
-            const { error: variantError } = await supabase
+            let { error: variantError } = await supabase
               .from('product_variants')
               .insert(variantRows);
 
+            // Fallback if schema does not have optional columns yet
             if (variantError) {
-              console.error('Variants Insert Error:', variantError);
-              alert('خطأ في حفظ متغيرات المنتج: ' + (variantError.message || JSON.stringify(variantError)));
-              setIsSubmitting(false);
-              return;
+              console.warn('First variant insert attempt notice, trying fallback core fields:', variantError.message);
+              const fallbackRows = variantRows.map((r) => ({
+                product_id: r.product_id,
+                color_name: r.color_name,
+                size: r.size,
+                delivery_stock: r.delivery_stock,
+                store_stock: r.store_stock,
+                wholesale_stock: r.wholesale_stock,
+              }));
+
+              const { error: fallbackError } = await supabase
+                .from('product_variants')
+                .insert(fallbackRows);
+
+              if (fallbackError) {
+                console.error('Variants Insert Error:', fallbackError);
+                alert('خطأ في حفظ متغيرات المنتج: ' + (fallbackError.message || JSON.stringify(fallbackError)));
+                setIsSubmitting(false);
+                return;
+              }
             }
           }
         }
@@ -1191,7 +1225,7 @@ export default function AddProductModal({
                               className={`w-full py-1 rounded-xl text-xs font-mono font-black flex items-center justify-center gap-1 transition-all ${
                                 isActive
                                   ? 'bg-[#8A2B43] text-white shadow-xs'
-                                  : 'bg-white text-gray-600 border border-gray-200'
+                                  : 'bg-white text-[#7A1C32] border border-gray-200'
                               }`}
                             >
                               <span>{size}</span>
