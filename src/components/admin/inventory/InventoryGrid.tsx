@@ -12,6 +12,8 @@ import {
   Edit3,
   Clock,
   Sparkles,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { Product, StockType, Category, ProductVariant } from '@/types/admin';
@@ -131,6 +133,7 @@ function ProductCardImageCarousel({ product }: { product: Product }) {
 
   return (
     <div
+      dir="ltr"
       className="relative w-20 h-20 rounded-2xl bg-pyjama-cream border border-gray-200 overflow-hidden shrink-0 shadow-inner group/carousel"
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
@@ -150,18 +153,18 @@ function ProductCardImageCarousel({ product }: { product: Product }) {
           <button
             type="button"
             onClick={handlePrev}
-            className="absolute left-0.5 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-black/60 hover:bg-[#8A2B43] text-white flex items-center justify-center opacity-0 group-hover/carousel:opacity-100 transition-opacity z-10 text-[10px] font-bold"
+            className="absolute left-0.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-black/70 hover:bg-[#8A2B43] text-white flex items-center justify-center opacity-0 group-hover/carousel:opacity-100 transition-all z-10 shadow-md transform hover:scale-110 active:scale-95"
             title="الصورة السابقة"
           >
-            ‹
+            <ChevronLeft className="w-3.5 h-3.5 stroke-[2.5]" />
           </button>
           <button
             type="button"
             onClick={handleNext}
-            className="absolute right-0.5 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-black/60 hover:bg-[#8A2B43] text-white flex items-center justify-center opacity-0 group-hover/carousel:opacity-100 transition-opacity z-10 text-[10px] font-bold"
+            className="absolute right-0.5 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full bg-black/70 hover:bg-[#8A2B43] text-white flex items-center justify-center opacity-0 group-hover/carousel:opacity-100 transition-all z-10 shadow-md transform hover:scale-110 active:scale-95"
             title="الصورة التالية"
           >
-            ›
+            <ChevronRight className="w-3.5 h-3.5 stroke-[2.5]" />
           </button>
 
           <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex items-center gap-0.5 z-10">
