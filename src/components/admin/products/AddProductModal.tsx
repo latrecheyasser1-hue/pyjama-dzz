@@ -305,18 +305,34 @@ export default function AddProductModal({
       setMinWholesaleSeries(productToEdit.minWholesaleSeries ?? 1);
       setSuperGrosThreshold(productToEdit.superGrosThreshold ?? 10);
       const rawDesc = productToEdit.description || '';
-      const cleanDisplayDesc = rawDesc.replace(/<!--COLOR_IMAGES:[\s\S]*?-->/g, '').trim();
+      const cleanDisplayDesc = rawDesc
+        .replace(/<!--COLOR_IMAGES:[\s\S]*?-->/g, '')
+        .replace(/<!--COLOR_METADATA:[\s\S]*?-->/g, '')
+        .trim();
       setDescription(cleanDisplayDesc);
 
-      // Extract colorImageMap from description metadata if present
+      // Extract color metadata maps from description if present
       let descColorMap: Record<string, string> = {};
+      let descHexMap: Record<string, string> = {};
+
       if (productToEdit.description) {
-        const match = productToEdit.description.match(/<!--COLOR_IMAGES:([\s\S]*?)-->/);
-        if (match && match[1]) {
+        const metaMatch = productToEdit.description.match(/<!--COLOR_METADATA:([\s\S]*?)-->/);
+        if (metaMatch && metaMatch[1]) {
           try {
-            descColorMap = JSON.parse(match[1]);
+            const parsed = JSON.parse(metaMatch[1]);
+            if (parsed.images) descColorMap = parsed.images;
+            if (parsed.hexes) descHexMap = parsed.hexes;
           } catch (e) {
-            console.warn('Notice parsing descColorMap:', e);
+            console.warn('Notice parsing descMetadata:', e);
+          }
+        } else {
+          const match = productToEdit.description.match(/<!--COLOR_IMAGES:([\s\S]*?)-->/);
+          if (match && match[1]) {
+            try {
+              descColorMap = JSON.parse(match[1]);
+            } catch (e) {
+              console.warn('Notice parsing descColorMap:', e);
+            }
           }
         }
       }
@@ -353,7 +369,7 @@ export default function AddProductModal({
         }
       }
 
-      // Query product_variants directly from DB on edit to guarantee color_image_url hydration
+      // Query product_variants directly from DB on edit to guarantee color_image_url and color_hex hydration
       const hydrateColorVariantsFromDb = async () => {
         const { data: dbVars } = await supabase
           .from('product_variants')
@@ -364,6 +380,7 @@ export default function AddProductModal({
           ? dbVars.map((v: any) => ({
               size: v.size || v.size_name || 'Standard',
               color: v.color_name || v.color || 'أساسي',
+              color_hex: v.color_hex || v.colorHex || undefined,
               color_image_url: v.color_image_url || v.colorImageUrl || undefined,
               deliveryStock: Number(v.delivery_stock) || 0,
               storeStock: Number(v.store_stock) || 0,
@@ -407,8 +424,9 @@ export default function AddProductModal({
             }
           });
 
-          // Extract color_image_url from variant rows, metadata map, or color object in prop
+          // Extract color_image_url and color_hex from variant rows, metadata map, or color object in prop
           const varWithImg = vars.find((v) => v.color_image_url || v.colorImageUrl);
+          const varWithHex = vars.find((v) => v.color_hex || v.colorHex);
           const colorPropObj = productToEdit.colors?.find((c) => c.colorName === colName);
 
           const savedImage =
@@ -418,10 +436,17 @@ export default function AddProductModal({
             colorPropObj?.imageUrl ||
             '';
 
+          const savedHex =
+            varWithHex?.color_hex ||
+            varWithHex?.colorHex ||
+            descHexMap[colName] ||
+            colorPropObj?.colorHex ||
+            '#ffffff';
+
           return {
             id: `c-edit-${idx}-${Date.now()}`,
             colorName: colName,
-            colorHex: '#ffffff',
+            colorHex: savedHex, // 100% PERSISTENT SAVED COLOR HEX FROM DB AND METADATA!
             imageUrl: savedImage, // 100% PERSISTENT SAVED IMAGE FROM DB AND METADATA!
             deliveryStocks: delStocks,
             storeStocks: storeStocks,
@@ -721,11 +746,12 @@ export default function AddProductModal({
   const insertVariantsWithResilience = async (rows: any[]): Promise<boolean> => {
     if (rows.length === 0) return true;
 
-    // Helper to sanitize row objects (strip string IDs like 'v-...' and preserve color_image_url)
+    // Helper to sanitize row objects (strip string IDs like 'v-...' and preserve color_hex and color_image_url)
     const sanitizeRow = (r: any) => {
       const cleanRow: Record<string, any> = {
         product_id: r.product_id,
         color_name: r.color_name,
+        color_hex: r.color_hex || r.colorHex || null,
         color_image_url: r.color_image_url || null,
         size: r.size || r.size_name,
         size_name: r.size_name || r.size,
@@ -951,17 +977,29 @@ export default function AddProductModal({
       // Primary product image: first non-empty color image or null
       const primaryProductImg = sanitizedColors.find((c) => c.imageUrl && c.imageUrl.trim() !== '')?.imageUrl || null;
 
-      // Encode per-color images into description metadata tag as an unbeatable fallback store
+      // Encode per-color images and hexes into description metadata tag as an unbeatable fallback store
       const colorImageMap: Record<string, string> = {};
+      const colorHexMap: Record<string, string> = {};
       sanitizedColors.forEach((c) => {
-        if (c.colorName.trim() && c.imageUrl && c.imageUrl.trim() !== '') {
-          colorImageMap[c.colorName.trim()] = c.imageUrl.trim();
+        const cName = c.colorName.trim();
+        if (cName) {
+          if (c.imageUrl && c.imageUrl.trim() !== '') {
+            colorImageMap[cName] = c.imageUrl.trim();
+          }
+          if (c.colorHex && c.colorHex.trim() !== '') {
+            colorHexMap[cName] = c.colorHex.trim();
+          }
         }
       });
 
-      let finalDesc = description.replace(/<!--COLOR_IMAGES:[\s\S]*?-->/g, '').trim();
-      if (Object.keys(colorImageMap).length > 0) {
-        finalDesc = `${finalDesc}\n<!--COLOR_IMAGES:${JSON.stringify(colorImageMap)}-->`.trim();
+      let finalDesc = description
+        .replace(/<!--COLOR_IMAGES:[\s\S]*?-->/g, '')
+        .replace(/<!--COLOR_METADATA:[\s\S]*?-->/g, '')
+        .trim();
+
+      const metaPayload = { images: colorImageMap, hexes: colorHexMap };
+      if (Object.keys(colorImageMap).length > 0 || Object.keys(colorHexMap).length > 0) {
+        finalDesc = `${finalDesc}\n<!--COLOR_METADATA:${JSON.stringify(metaPayload)}-->`.trim();
       }
 
       const productPayload: Record<string, any> = {
@@ -1025,11 +1063,14 @@ export default function AddProductModal({
           }
 
           const colImg = c.imageUrl || undefined;
+          const colHex = c.colorHex || '#ffffff';
           generatedVariants.push({
             id: existingV ? String(existingV.id) : `v-${Date.now()}-${c.colorName}-${s}`,
             productId: isEditMode && productToEdit ? productToEdit.id : '',
             size: s,
             color: c.colorName.trim(),
+            color_hex: colHex,
+            colorHex: colHex,
             color_image_url: colImg,
             colorImageUrl: colImg,
             deliveryStock: finalDel,
@@ -1061,6 +1102,7 @@ export default function AddProductModal({
         const variantRows = generatedVariants.map((v) => ({
           product_id: productToEdit.id,
           color_name: v.color,
+          color_hex: sanitizedColors.find((c) => c.colorName.trim() === v.color)?.colorHex || v.color_hex || '#ffffff',
           color_image_url: sanitizedColors.find((c) => c.colorName.trim() === v.color)?.imageUrl || null,
           size: v.size,
           size_name: v.size,
@@ -1085,7 +1127,7 @@ export default function AddProductModal({
           costPrice: Number(costPrice) || 0,
           description: description.trim() || undefined,
           imageUrl: primaryProductImg || undefined,
-          colors: sanitizedColors.map((c) => ({ colorName: c.colorName, imageUrl: c.imageUrl || undefined })),
+          colors: sanitizedColors.map((c) => ({ colorName: c.colorName, colorHex: c.colorHex || '#ffffff', imageUrl: c.imageUrl || undefined })),
           sizes: generatedSizesList,
           variants: generatedVariants,
         };
@@ -1140,6 +1182,7 @@ export default function AddProductModal({
           const variantRows = generatedVariants.map((v) => ({
             product_id: insertedProductId,
             color_name: v.color,
+            color_hex: sanitizedColors.find((c) => c.colorName.trim() === v.color)?.colorHex || v.color_hex || '#ffffff',
             color_image_url: sanitizedColors.find((c) => c.colorName.trim() === v.color)?.imageUrl || null,
             size: v.size,
             size_name: v.size,

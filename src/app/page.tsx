@@ -305,12 +305,23 @@ export default function MasterAdminPage() {
 
       const mappedProducts: Product[] = prodData.map((p: any) => {
         let descColorMap: Record<string, string> = {};
+        let descHexMap: Record<string, string> = {};
+
         if (p.description) {
-          const match = p.description.match(/<!--COLOR_IMAGES:([\s\S]*?)-->/);
-          if (match && match[1]) {
+          const metaMatch = p.description.match(/<!--COLOR_METADATA:([\s\S]*?)-->/);
+          if (metaMatch && metaMatch[1]) {
             try {
-              descColorMap = JSON.parse(match[1]);
+              const parsed = JSON.parse(metaMatch[1]);
+              if (parsed.images) descColorMap = parsed.images;
+              if (parsed.hexes) descHexMap = parsed.hexes;
             } catch (e) {}
+          } else {
+            const match = p.description.match(/<!--COLOR_IMAGES:([\s\S]*?)-->/);
+            if (match && match[1]) {
+              try {
+                descColorMap = JSON.parse(match[1]);
+              } catch (e) {}
+            }
           }
         }
 
@@ -319,12 +330,15 @@ export default function MasterAdminPage() {
               .filter((v: any) => String(v.product_id) === String(p.id))
               .map((v: any) => {
                 const col = v.color_name || v.color || 'أساسي';
+                const hex = v.color_hex || v.colorHex || descHexMap[col] || '#ffffff';
                 const img = v.color_image_url || v.colorImageUrl || descColorMap[col] || undefined;
                 return {
                   id: String(v.id),
                   productId: String(v.product_id),
                   size: v.size || v.size_name || 'Standard',
                   color: col,
+                  color_hex: hex,
+                  colorHex: hex,
                   color_image_url: img,
                   colorImageUrl: img,
                   deliveryStock: Number(v.delivery_stock) || 0,
@@ -337,12 +351,17 @@ export default function MasterAdminPage() {
           : [];
 
         const colorMap = new Map<string, string | undefined>();
+        const colorHexMap = new Map<string, string | undefined>();
         if (varData) {
           varData.filter((v: any) => String(v.product_id) === String(p.id)).forEach((v: any) => {
             const col = v.color_name || v.color;
+            const hex = v.color_hex || v.colorHex;
             const img = v.color_image_url || v.colorImageUrl || v.imageUrl;
             if (col && img && !colorMap.has(col)) {
               colorMap.set(col, img);
+            }
+            if (col && hex && !colorHexMap.has(col)) {
+              colorHexMap.set(col, hex);
             }
           });
         }
@@ -351,6 +370,7 @@ export default function MasterAdminPage() {
         pVariants.forEach((v) => colorsSet.add(v.color));
         const colors = Array.from(colorsSet).map((cName) => ({
           colorName: cName,
+          colorHex: colorHexMap.get(cName) || descHexMap[cName] || '#ffffff',
           imageUrl: colorMap.get(cName) || descColorMap[cName] || undefined,
         }));
 

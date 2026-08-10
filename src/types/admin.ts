@@ -78,6 +78,8 @@ export interface ProductVariant {
   productId: string;
   size: string;
   color: string;
+  color_hex?: string;
+  colorHex?: string;
   color_image_url?: string;
   colorImageUrl?: string;
   deliveryStock: number;  // مخزون التوصيل
@@ -91,6 +93,7 @@ export interface ProductColor {
   id?: string;
   productId?: string;
   colorName: string;
+  colorHex?: string;
   imageUrl?: string;
 }
 
