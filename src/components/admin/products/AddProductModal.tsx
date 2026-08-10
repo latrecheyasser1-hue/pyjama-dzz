@@ -347,17 +347,34 @@ export default function AddProductModal({
     setSku(`PYJ-${timestampSuffix}${randomNum}`);
   };
 
-  // Size Category Change with Strict Filtering & Active Size Reset
+  // Size Category Change with Strict Filtering & Defaults per Category
   const handleSizeCategoryChange = (catKey: SizeCategoryKey) => {
     setSizeCategory(catKey);
     setIsStandardSize(false);
     const availableSizes = SIZE_CATEGORIES[catKey].sizes;
-    const newMin = availableSizes[0];
-    const newMax = availableSizes[Math.min(3, availableSizes.length - 1)];
+
+    let newMin = availableSizes[0];
+    let newMax = availableSizes[Math.min(3, availableSizes.length - 1)];
+
+    if (catKey === 'SHOES') {
+      newMin = '36';
+      newMax = '42';
+    } else if (catKey === 'LINGERIE') {
+      newMin = '75B';
+      newMax = '95B';
+    } else if (catKey === 'CLOTHING') {
+      newMin = 'S';
+      newMax = 'XL';
+    }
+
     setMinSize(newMin);
     setMaxSize(newMax);
 
-    const defaultSizes = availableSizes.slice(0, 4);
+    const minIdx = availableSizes.indexOf(newMin);
+    const maxIdx = availableSizes.indexOf(newMax);
+    const defaultSizes = minIdx !== -1 && maxIdx !== -1 && minIdx <= maxIdx
+      ? availableSizes.slice(minIdx, maxIdx + 1)
+      : availableSizes.slice(0, 4);
 
     setColors((prev) =>
       prev.map((c) => {
