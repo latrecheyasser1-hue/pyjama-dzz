@@ -541,6 +541,7 @@ export default function AddProductModal({
         colorName: '',
         colorHex: '#ffffff',
         imageUrl: '',
+        imageFile: undefined,
         deliveryStocks: initDel,
         storeStocks: initStore,
         wholesaleStocks: initWs,
@@ -578,24 +579,24 @@ export default function AddProductModal({
     }
   };
 
-  // Direct Image File Upload Handler with Instant Preview and Asynchronous Storage Upload
-  const handleImageFileChange = async (colorId: string, file: File) => {
+  // INDEPENDENT UPLOAD HANDLER PER COLOR INDEX (Strictly modifies ONLY target colorIndex)
+  const handleColorImageChange = async (colorIndex: number, file: File) => {
     if (!file) return;
 
-    // 1. Instant local preview with File preservation in state
+    // 1. Set instant local preview strictly on target color index
     const localUrl = URL.createObjectURL(file);
     setColors((prev) =>
-      prev.map((c) => (c.id === colorId ? { ...c, imageUrl: localUrl, imageFile: file } : c))
+      prev.map((c, idx) => (idx === colorIndex ? { ...c, imageUrl: localUrl, imageFile: file } : c))
     );
 
-    // 2. Asynchronous binary upload to Supabase Storage
+    // 2. Upload binary to Supabase Storage and set publicUrl strictly on target color index
     try {
       const publicUrl = await uploadImageToSupabase(file);
       setColors((prev) =>
-        prev.map((c) => (c.id === colorId ? { ...c, imageUrl: publicUrl } : c))
+        prev.map((c, idx) => (idx === colorIndex ? { ...c, imageUrl: publicUrl } : c))
       );
     } catch (err) {
-      console.warn('Asynchronous storage upload notice (retaining preview for pre-submit retry):', err);
+      console.warn('Storage upload error on color index', colorIndex, err);
     }
   };
 
@@ -921,13 +922,16 @@ export default function AddProductModal({
 
       const firstColorTotalItemsInSerie = sanitizedColors[0] ? getSerieTotalItems(sanitizedColors[0]) : 4;
 
+      // Primary product image: first non-empty color image or null
+      const primaryProductImg = sanitizedColors.find((c) => c.imageUrl && c.imageUrl.trim() !== '')?.imageUrl || null;
+
       const productPayload: Record<string, any> = {
         name: nameAr.trim(),
         sku: finalSku,
         category_id: categoryId || null,
         cost_price: Number(costPrice) || 0,
         description: description.trim() || null,
-        image_url: sanitizedColors[0]?.imageUrl || null,
+        image_url: primaryProductImg,
         size_category: sizeCategory,
       };
 
@@ -953,7 +957,7 @@ export default function AddProductModal({
       const selectedCat = categories.find((cat) => cat.id === categoryId);
       const generatedVariants: ProductVariant[] = [];
 
-      activeColors.forEach((c) => {
+      sanitizedColors.forEach((c) => {
         c.activeSizes.forEach((s) => {
           const existingV = existingDbVariants.find(
             (ev) =>
@@ -1038,7 +1042,7 @@ export default function AddProductModal({
           categoryNameAr: selectedCat?.name || undefined,
           costPrice: Number(costPrice) || 0,
           description: description.trim() || undefined,
-          imageUrl: sanitizedColors[0]?.imageUrl || undefined,
+          imageUrl: primaryProductImg || undefined,
           colors: sanitizedColors.map((c) => ({ colorName: c.colorName, imageUrl: c.imageUrl || undefined })),
           sizes: generatedSizesList,
           variants: generatedVariants,
@@ -1128,7 +1132,7 @@ export default function AddProductModal({
           minWholesaleSeries: Number(minWholesaleSeries) || 1,
           superGrosThreshold: Number(superGrosThreshold) || 10,
           description: description.trim() || undefined,
-          imageUrl: sanitizedColors[0]?.imageUrl || undefined,
+          imageUrl: primaryProductImg || undefined,
           colors: sanitizedColors.map((c) => ({ colorName: c.colorName, imageUrl: c.imageUrl || undefined })),
           sizes: generatedSizesList,
           variants: generatedVariants,
@@ -1660,7 +1664,7 @@ export default function AddProductModal({
                       )}
                     </div>
 
-                    {/* Middle: Direct Image File Upload Dropzone */}
+                    {/* Middle: Direct Image File Upload Dropzone (Targeted strictly by color Index) */}
                     <div>
                       <label className="block text-xs font-bold text-gray-700 mb-1.5">
                         صورة هذا اللون (Direct Image Upload)
@@ -1682,7 +1686,7 @@ export default function AddProductModal({
                                 className="hidden"
                                 onChange={(e) => {
                                   const file = e.target.files?.[0];
-                                  if (file) handleImageFileChange(colorItem.id, file);
+                                  if (file) handleColorImageChange(index, file);
                                 }}
                               />
                             </label>
@@ -1707,7 +1711,7 @@ export default function AddProductModal({
                             className="hidden"
                             onChange={(e) => {
                               const file = e.target.files?.[0];
-                              if (file) handleImageFileChange(colorItem.id, file);
+                              if (file) handleColorImageChange(index, file);
                             }}
                           />
                         </label>
