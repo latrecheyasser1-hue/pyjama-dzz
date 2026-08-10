@@ -109,6 +109,7 @@ export interface Product {
   costPrice: number;
   sellingPrice: number;
   oldPrice?: number | null;
+  bulkDiscountPrice5?: number | null;
   wholesalePrice?: number | null;
   superGrosPrice?: number | null;
   unitsPerSerie?: number;

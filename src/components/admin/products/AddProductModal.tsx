@@ -98,6 +98,7 @@ export default function AddProductModal({
   const [costPrice, setCostPrice] = useState<number | ''>('');
   const [sellingPrice, setSellingPrice] = useState<number | ''>('');
   const [oldPrice, setOldPrice] = useState<number | ''>('');
+  const [bulkDiscountPrice5, setBulkDiscountPrice5] = useState<number | ''>('');
   const [wholesalePrice, setWholesalePrice] = useState<number | ''>('');
   const [superGrosPrice, setSuperGrosPrice] = useState<number | ''>('');
 
@@ -148,6 +149,7 @@ export default function AddProductModal({
     setCostPrice('');
     setSellingPrice('');
     setOldPrice('');
+    setBulkDiscountPrice5('');
     setWholesalePrice('');
     setSuperGrosPrice('');
     setMinWholesaleSeries(1);
@@ -234,6 +236,7 @@ export default function AddProductModal({
       setCostPrice(productToEdit.costPrice ?? '');
       setSellingPrice(productToEdit.sellingPrice ?? '');
       setOldPrice(productToEdit.oldPrice ?? '');
+      setBulkDiscountPrice5(productToEdit.bulkDiscountPrice5 ?? (productToEdit as any).bulk_discount_price_5 ?? '');
       setWholesalePrice(productToEdit.wholesalePrice ?? '');
       setSuperGrosPrice(productToEdit.superGrosPrice ?? '');
       setMinWholesaleSeries(productToEdit.minWholesaleSeries ?? 1);
@@ -632,6 +635,7 @@ export default function AddProductModal({
         productPayload.supplier_phone = supplierPhone.trim() || null;
         productPayload.selling_price = Number(sellingPrice) || 0;
         productPayload.old_price = oldPrice !== '' ? Number(oldPrice) : null;
+        productPayload.bulk_discount_price_5 = bulkDiscountPrice5 !== '' ? Number(bulkDiscountPrice5) : null;
       }
 
       if (activeWarehouse === 'WHOLESALE') {
@@ -740,6 +744,7 @@ export default function AddProductModal({
           updatedProdObj.supplierPhone = supplierPhone.trim() || undefined;
           updatedProdObj.sellingPrice = Number(sellingPrice) || 0;
           updatedProdObj.oldPrice = oldPrice !== '' ? Number(oldPrice) : null;
+          updatedProdObj.bulkDiscountPrice5 = bulkDiscountPrice5 !== '' ? Number(bulkDiscountPrice5) : null;
         }
 
         if (activeWarehouse === 'WHOLESALE') {
@@ -808,6 +813,7 @@ export default function AddProductModal({
           costPrice: Number(costPrice) || 0,
           sellingPrice: Number(sellingPrice) || 0,
           oldPrice: oldPrice !== '' ? Number(oldPrice) : null,
+          bulkDiscountPrice5: bulkDiscountPrice5 !== '' ? Number(bulkDiscountPrice5) : null,
           wholesalePrice: wholesalePrice !== '' ? Number(wholesalePrice) : null,
           superGrosPrice: superGrosPrice !== '' ? Number(superGrosPrice) : null,
           unitsPerSerie: firstColorTotalItemsInSerie,
@@ -1018,7 +1024,7 @@ export default function AddProductModal({
               )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               {/* Cost Price */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">
@@ -1028,7 +1034,7 @@ export default function AddProductModal({
                   type="number"
                   value={costPrice}
                   onChange={(e) => setCostPrice(e.target.value === '' ? '' : Number(e.target.value))}
-                  placeholder="0"
+                  placeholder=""
                   className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold focus:outline-none focus:border-[#8A2B43] shadow-sm"
                 />
               </div>
@@ -1038,13 +1044,13 @@ export default function AddProductModal({
                 <>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">
-                      {activeWarehouse === 'DELIVERY' ? 'سعر البيع بالتجزئة الإلكترونية (DZD)' : 'سعر البيع بمحل الشلف (DZD)'} <span className="text-rose-500">*</span>
+                      {activeWarehouse === 'DELIVERY' ? 'سعر البيع بالتجزئة (Vente DZD)' : 'سعر البيع بمحل الشلف (Vente DZD)'} <span className="text-rose-500">*</span>
                     </label>
                     <input
                       type="number"
                       value={sellingPrice}
                       onChange={(e) => setSellingPrice(e.target.value === '' ? '' : Number(e.target.value))}
-                      placeholder="0"
+                      placeholder=""
                       className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold text-[#8A2B43] focus:outline-none focus:border-[#8A2B43] shadow-sm"
                       required
                     />
@@ -1052,14 +1058,27 @@ export default function AddProductModal({
 
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">
-                      السعر القديم قبل الخصم (DZD)
+                      السعر القديم قبل الخصم (Old Price DZD)
                     </label>
                     <input
                       type="number"
                       value={oldPrice}
                       onChange={(e) => setOldPrice(e.target.value === '' ? '' : Number(e.target.value))}
-                      placeholder="0"
+                      placeholder=""
                       className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold text-gray-400 focus:outline-none focus:border-[#8A2B43] shadow-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#8A2B43] mb-1">
+                      سعر القطعة عند شراء 5 حبات فما فوق (5+ Units Volume Price DZD)
+                    </label>
+                    <input
+                      type="number"
+                      value={bulkDiscountPrice5}
+                      onChange={(e) => setBulkDiscountPrice5(e.target.value === '' ? '' : Number(e.target.value))}
+                      placeholder=""
+                      className="w-full px-4 py-3 bg-white rounded-xl border border-pyjama-pink text-xs font-mono font-bold text-[#8A2B43] focus:outline-none focus:border-[#8A2B43] shadow-sm"
                     />
                   </div>
                 </>
@@ -1076,7 +1095,7 @@ export default function AddProductModal({
                       type="number"
                       value={wholesalePrice}
                       onChange={(e) => setWholesalePrice(e.target.value === '' ? '' : Number(e.target.value))}
-                      placeholder="0"
+                      placeholder=""
                       className="w-full px-4 py-3 bg-white rounded-xl border border-purple-200 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-purple-800 shadow-sm"
                       required
                     />
@@ -1090,7 +1109,7 @@ export default function AddProductModal({
                       type="number"
                       value={superGrosPrice}
                       onChange={(e) => setSuperGrosPrice(e.target.value === '' ? '' : Number(e.target.value))}
-                      placeholder="0"
+                      placeholder=""
                       className="w-full px-4 py-3 bg-white rounded-xl border border-purple-200 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-purple-800 shadow-sm"
                     />
                   </div>
