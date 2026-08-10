@@ -119,8 +119,8 @@ export default function AddProductModal({
       colorHex: '#8A2B43',
       imageUrl: '',
       deliveryStocks: { S: 10, M: 10, L: 10, XL: 10 },
-      storeStocks: { S: 5, M: 5, L: 5, XL: 5 },
-      wholesaleStocks: { S: 20, M: 20, L: 20, XL: 20 },
+      storeStocks: { S: 0, M: 0, L: 0, XL: 0 },
+      wholesaleStocks: { S: 0, M: 0, L: 0, XL: 0 },
       serieComposition: { S: 2, M: 2, L: 2, XL: 2 },
       activeSizes: ['S', 'M', 'L', 'XL'],
     },
@@ -163,8 +163,8 @@ export default function AddProductModal({
         colorHex: '#8A2B43',
         imageUrl: '',
         deliveryStocks: { S: 10, M: 10, L: 10, XL: 10 },
-        storeStocks: { S: 5, M: 5, L: 5, XL: 5 },
-        wholesaleStocks: { S: 20, M: 20, L: 20, XL: 20 },
+        storeStocks: { S: 0, M: 0, L: 0, XL: 0 },
+        wholesaleStocks: { S: 0, M: 0, L: 0, XL: 0 },
         serieComposition: { S: 2, M: 2, L: 2, XL: 2 },
         activeSizes: ['S', 'M', 'L', 'XL'],
       },
@@ -382,9 +382,9 @@ export default function AddProductModal({
     const initSerieComp: Record<string, number> = {};
 
     generatedSizesList.forEach((s) => {
-      initDel[s] = 10;
-      initStore[s] = 5;
-      initWs[s] = 20;
+      initDel[s] = activeWarehouse === 'DELIVERY' ? 10 : 0;
+      initStore[s] = activeWarehouse === 'STORE' ? 5 : 0;
+      initWs[s] = 0;
       initSerieComp[s] = 2;
     });
 
@@ -576,7 +576,7 @@ export default function AddProductModal({
     return false;
   };
 
-  // Context-Isolated Supabase Submit Handler
+  // Context-Isolated Supabase Submit Handler with Zero-Stock Defaults for Inactive Warehouses
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -653,16 +653,24 @@ export default function AddProductModal({
               (ev.size === s || ev.size_name === s)
           );
 
-          let finalDel = existingV ? Number(existingV.delivery_stock) || 0 : 10;
-          let finalStore = existingV ? Number(existingV.store_stock) || 0 : 5;
-          let finalWs = existingV ? Number(existingV.wholesale_stock) || 0 : 99;
+          // Default Zero-Stock values for new products across all 3 warehouses
+          let finalDel = 0;
+          let finalStore = 0;
+          let finalWs = 0;
 
+          if (isEditMode && existingV) {
+            finalDel = Number(existingV.delivery_stock) || 0;
+            finalStore = Number(existingV.store_stock) || 0;
+            finalWs = Number(existingV.wholesale_stock) || 0;
+          }
+
+          // Active Warehouse input assignment
           if (activeWarehouse === 'DELIVERY') {
             finalDel = c.deliveryStocks[s] !== undefined ? c.deliveryStocks[s] : 10;
           } else if (activeWarehouse === 'STORE') {
             finalStore = c.storeStocks[s] !== undefined ? c.storeStocks[s] : 5;
           } else if (activeWarehouse === 'WHOLESALE') {
-            finalWs = 99;
+            finalWs = 0;
           }
 
           generatedVariants.push({
@@ -754,7 +762,7 @@ export default function AddProductModal({
 
         alert('تم تعديل وحفظ بيانات المنتج بنجاح! ✅');
       } else {
-        // INSERT new product
+        // INSERT new product globally across all 3 warehouses with Zero-stock defaults for inactive warehouses
         let insertedProductId = `prod-${Date.now()}`;
         const { data: prodData, error: productError } = await supabase
           .from('products')
@@ -823,7 +831,7 @@ export default function AddProductModal({
           await reFetchProducts();
         }
 
-        alert('تم إضافة المنتج بنجاح! ✅');
+        alert('تم إضافة المنتج بنجاح وتسجيله في جميع المستودعات! ✅');
       }
 
       resetForm();
