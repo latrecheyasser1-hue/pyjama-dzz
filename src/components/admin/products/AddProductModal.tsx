@@ -701,59 +701,51 @@ export default function AddProductModal({
     return updated;
   };
 
-  // Ultra-resilient variant upsert helper with fallback strategies for size / size_name schema cache differences
+  // Resilient variant upsert helper (Sanitizes integer vs string IDs and guarantees color_image_url persistence)
   const insertVariantsWithResilience = async (rows: any[]): Promise<boolean> => {
     if (rows.length === 0) return true;
 
-    // Strategy 1: Upsert with size_name ONLY (matches original Supabase setup)
-    const rowsWithSizeNameOnly = rows.map((r) => ({
-      ...(r.id ? { id: r.id } : {}),
-      product_id: r.product_id,
-      color_name: r.color_name,
-      color_image_url: r.color_image_url,
-      size_name: r.size_name || r.size,
-      delivery_stock: r.delivery_stock,
-      store_stock: r.store_stock,
-      wholesale_stock: r.wholesale_stock,
-      serie_composition: r.serie_composition,
-    }));
+    // Helper to sanitize row objects (strip string IDs like 'v-...' and preserve color_image_url)
+    const sanitizeRow = (r: any) => {
+      const cleanRow: Record<string, any> = {
+        product_id: r.product_id,
+        color_name: r.color_name,
+        color_image_url: r.color_image_url || null,
+        size: r.size || r.size_name,
+        size_name: r.size_name || r.size,
+        delivery_stock: Number(r.delivery_stock) || 0,
+        store_stock: Number(r.store_stock) || 0,
+        wholesale_stock: Number(r.wholesale_stock) || 0,
+        serie_composition: r.serie_composition || null,
+      };
 
-    let { error: err1 } = await supabase.from('product_variants').upsert(rowsWithSizeNameOnly);
+      // Only include integer IDs if valid numeric ID exists
+      if (r.id && !isNaN(Number(r.id)) && Number(r.id) > 0) {
+        cleanRow.id = Number(r.id);
+      }
+
+      return cleanRow;
+    };
+
+    const sanitizedRows = rows.map(sanitizeRow);
+
+    // Strategy 1: Upsert with sanitized integer IDs or auto-generated IDs (includes color_image_url)
+    let { error: err1 } = await supabase.from('product_variants').upsert(sanitizedRows);
     if (!err1) return true;
 
-    // Strategy 2: Upsert with BOTH size AND size_name
-    const rowsWithBoth = rows.map((r) => ({
-      ...(r.id ? { id: r.id } : {}),
-      product_id: r.product_id,
-      color_name: r.color_name,
-      color_image_url: r.color_image_url,
-      size: r.size || r.size_name,
-      size_name: r.size_name || r.size,
-      delivery_stock: r.delivery_stock,
-      store_stock: r.store_stock,
-      wholesale_stock: r.wholesale_stock,
-      serie_composition: r.serie_composition,
-    }));
+    console.warn('Upsert strategy 1 notice, trying clean insert without id column:', err1?.message || err1);
 
-    let { error: err2 } = await supabase.from('product_variants').upsert(rowsWithBoth);
+    // Strategy 2: Remove ID column completely for clean insert (always succeeds after delete)
+    const rowsNoId = sanitizedRows.map((r) => {
+      const { id, ...rest } = r;
+      return rest;
+    });
+
+    let { error: err2 } = await supabase.from('product_variants').insert(rowsNoId);
     if (!err2) return true;
 
-    // Strategy 3: Basic columns with size_name
-    const rowsBasic = rows.map((r) => ({
-      ...(r.id ? { id: r.id } : {}),
-      product_id: r.product_id,
-      color_name: r.color_name,
-      size_name: r.size_name || r.size,
-      delivery_stock: r.delivery_stock,
-      store_stock: r.store_stock,
-      wholesale_stock: r.wholesale_stock,
-    }));
-
-    let { error: err3 } = await supabase.from('product_variants').upsert(rowsBasic);
-    if (!err3) return true;
-
-    console.error('All variant upsert attempts failed:', err3);
-    alert('خطأ في حفظ متغيرات المنتج: ' + (err3.message || JSON.stringify(err3)));
+    console.error('All variant insert attempts failed:', err2);
+    alert('خطأ في حفظ متغيرات المنتج: ' + (err2.message || JSON.stringify(err2)));
     return false;
   };
 
@@ -977,11 +969,14 @@ export default function AddProductModal({
             finalWs = 0;
           }
 
+          const colImg = c.imageUrl || undefined;
           generatedVariants.push({
             id: existingV ? String(existingV.id) : `v-${Date.now()}-${c.colorName}-${s}`,
             productId: isEditMode && productToEdit ? productToEdit.id : '',
             size: s,
             color: c.colorName.trim(),
+            color_image_url: colImg,
+            colorImageUrl: colImg,
             deliveryStock: finalDel,
             storeStock: finalStore,
             wholesaleStock: finalWs,
