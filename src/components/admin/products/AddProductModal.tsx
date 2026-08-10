@@ -520,10 +520,9 @@ export default function AddProductModal({
                   type="number"
                   value={costPrice}
                   onChange={(e) => setCostPrice(e.target.value === '' ? '' : Number(e.target.value))}
-                  placeholder="مثال: 3200"
+                  placeholder=""
                   className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold focus:outline-none focus:border-[#8A2B43] shadow-sm"
                 />
-                <p className="text-[10px] text-gray-400 mt-1">حساب صافي الأرباح</p>
               </div>
 
               {/* 2. Current Selling Price */}
@@ -535,11 +534,10 @@ export default function AddProductModal({
                   type="number"
                   value={sellingPrice}
                   onChange={(e) => setSellingPrice(e.target.value === '' ? '' : Number(e.target.value))}
-                  placeholder="مثال: 5500"
+                  placeholder=""
                   className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold text-[#8A2B43] focus:outline-none focus:border-[#8A2B43] shadow-sm"
                   required
                 />
-                <p className="text-[10px] text-[#8A2B43] font-bold mt-1">سعر القطعة الفردية في المتجر</p>
               </div>
 
               {/* 3. Old Price Before Discount */}
@@ -551,10 +549,9 @@ export default function AddProductModal({
                   type="number"
                   value={oldPrice}
                   onChange={(e) => setOldPrice(e.target.value === '' ? '' : Number(e.target.value))}
-                  placeholder="مثال: 6800 (اختياري)"
+                  placeholder=""
                   className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold text-gray-400 focus:outline-none focus:border-[#8A2B43] shadow-sm"
                 />
-                <p className="text-[10px] text-gray-500 mt-1">يظهر مشطوباً لإبراز التخفيض 🔥</p>
               </div>
 
               {/* 4. 5+ Units Retail Incentive Price */}
@@ -566,10 +563,9 @@ export default function AddProductModal({
                   type="number"
                   value={wholesalePrice}
                   onChange={(e) => setWholesalePrice(e.target.value === '' ? '' : Number(e.target.value))}
-                  placeholder="مثال: 4200 (اختياري)"
+                  placeholder=""
                   className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-[#8A2B43] shadow-sm"
                 />
-                <p className="text-[10px] text-purple-800 font-medium mt-1">سعر تشجيع شراء الكمية في التجزئة</p>
               </div>
             </div>
           </div>
