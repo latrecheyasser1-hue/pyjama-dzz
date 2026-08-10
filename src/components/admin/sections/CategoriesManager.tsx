@@ -7,8 +7,8 @@ import { Category, Product } from '@/types/admin';
 interface CategoriesManagerProps {
   categories: Category[];
   products?: Product[];
-  onAddCategory: (name: string) => void;
-  onDeleteCategory: (id: string) => void;
+  onAddCategory: (name: string) => Promise<boolean | void>;
+  onDeleteCategory: (id: string) => Promise<boolean | void>;
 }
 
 export default function CategoriesManager({
@@ -26,9 +26,11 @@ export default function CategoriesManager({
     if (!name.trim() || isSubmitting) return;
     setIsSubmitting(true);
     try {
-      await onAddCategory(name.trim());
-      setName('');
-      setIsFormOpen(false);
+      const success = await onAddCategory(name.trim());
+      if (success !== false) {
+        setName('');
+        setIsFormOpen(false);
+      }
     } finally {
       setIsSubmitting(false);
     }

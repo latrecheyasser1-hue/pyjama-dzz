@@ -216,21 +216,24 @@ export default function MasterAdminPage() {
         .select('*');
 
       if (error) {
-        console.warn('Supabase categories notice:', error.message || error.code || error);
+        console.warn('Supabase categories select notice:', error.message || error.code || error);
         return;
       }
 
-      if (data && data.length > 0) {
+      if (data) {
         const mapped: Category[] = data.map((item: any) => ({
           id: String(item.id),
           name: item.name || item.name_ar || item.name_fr || '',
           slug: item.slug || (item.name || '').toLowerCase().trim().replace(/\s+/g, '-'),
-          coverImageUrl: item.cover_image_url || item.image_url || null,
+          imageUrl: item.image_url || item.cover_image_url || null,
+          coverImageUrl: item.image_url || item.cover_image_url || null,
+          isActive: item.is_active ?? true,
+          createdAt: item.created_at,
         }));
         setCategories(mapped);
       }
     } catch (err: any) {
-      console.warn('Failed to fetch categories:', err?.message || err);
+      console.warn('Failed to fetch categories from Supabase:', err?.message || err);
     }
   }, []);
 
@@ -302,50 +305,47 @@ export default function MasterAdminPage() {
     );
   };
 
-  const handleAddCategory = async (name: string) => {
-    const slug = name.toLowerCase().trim().replace(/\s+/g, '-');
-    const newCat: Category = {
-      id: `cat-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      name,
-      slug,
-    };
-
-    // Optimistically update local state so UI updates instantly
-    setCategories((prev) => [...prev, newCat]);
+  // Synchronous Supabase Insert with explicit Error Handling & Re-fetch
+  const handleAddCategory = async (name: string): Promise<boolean> => {
+    if (!name.trim()) return false;
 
     try {
       const { data, error } = await supabase
         .from('categories')
-        .insert([{ name, slug }])
+        .insert([{ name: name.trim() }])
         .select();
 
       if (error) {
-        console.warn('Supabase category insert notice:', error.message || error.code || error);
-      } else if (data && data.length > 0) {
-        const dbCat: Category = {
-          id: String(data[0].id),
-          name: data[0].name || name,
-          slug: data[0].slug || slug,
-          coverImageUrl: data[0].cover_image_url || data[0].image_url || null,
-        };
-        setCategories((prev) => prev.map((c) => (c.id === newCat.id ? dbCat : c)));
+        console.error('Supabase Category Insert Error:', error);
+        alert('خطأ في الحفظ في قاعدة البيانات: ' + (error.message || JSON.stringify(error)));
+        return false;
       }
+
+      console.log('Category saved successfully:', data);
+      await fetchCategories(); // Synchronously re-fetch from DB
+      return true;
     } catch (err: any) {
-      console.warn('Failed to insert category into Supabase:', err?.message || err);
+      console.error('Failed to insert category into Supabase:', err);
+      alert('خطأ في الحفظ في قاعدة البيانات: ' + (err?.message || String(err)));
+      return false;
     }
   };
 
-  const handleDeleteCategory = async (id: string) => {
-    // Optimistic UI update
-    setCategories((prev) => prev.filter((c) => c.id !== id));
-
+  // Synchronous Supabase Delete with explicit Error Handling & Re-fetch
+  const handleDeleteCategory = async (id: string): Promise<boolean> => {
     try {
       const { error } = await supabase.from('categories').delete().eq('id', id);
       if (error) {
-        console.warn('Supabase category delete notice:', error.message || error.code || error);
+        console.error('Supabase Category Delete Error:', error);
+        alert('خطأ في الحذف من قاعدة البيانات: ' + (error.message || JSON.stringify(error)));
+        return false;
       }
+      await fetchCategories(); // Synchronously re-fetch from DB
+      return true;
     } catch (err: any) {
-      console.warn('Failed to delete category from Supabase:', err?.message || err);
+      console.error('Failed to delete category from Supabase:', err);
+      alert('خطأ في الحذف من قاعدة البيانات: ' + (err?.message || String(err)));
+      return false;
     }
   };
 
