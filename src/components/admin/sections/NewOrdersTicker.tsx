@@ -157,9 +157,9 @@ export default function NewOrdersTicker({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 font-sans">
-                {retailOrders.map((o) => (
+                {retailOrders.map((o, idx) => (
                   <tr
-                    key={o.id}
+                    key={`retail-tr-${o.id}-${idx}`}
                     className="hover:bg-pyjama-cream/30 transition-all cursor-pointer"
                     onClick={() => setSelectedOrder(o)}
                   >
@@ -265,9 +265,9 @@ export default function NewOrdersTicker({
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 font-sans">
-                {wholesaleOrders.map((o) => (
+                {wholesaleOrders.map((o, idx) => (
                   <tr
-                    key={o.id}
+                    key={`wholesale-tr-${o.id}-${idx}`}
                     className="hover:bg-purple-50/40 transition-all cursor-pointer"
                     onClick={() => setSelectedOrder(o)}
                   >
