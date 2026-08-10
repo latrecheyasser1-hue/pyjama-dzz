@@ -541,41 +541,56 @@ export default function AddProductModal({
     return null;
   };
 
-  // Ultra-resilient variant insertion helper with fallback strategies
+  // Ultra-resilient variant insertion helper with fallback strategies for size / size_name schema cache differences
   const insertVariantsWithResilience = async (rows: any[]): Promise<boolean> => {
     if (rows.length === 0) return true;
 
-    let { error } = await supabase.from('product_variants').insert(rows);
-    if (!error) return true;
-
-    const fallbackRows1 = rows.map((r) => ({
+    // Strategy 1: Insert with size_name ONLY (matches original Supabase setup)
+    const rowsWithSizeNameOnly = rows.map((r) => ({
       product_id: r.product_id,
       color_name: r.color_name,
       color_image_url: r.color_image_url,
-      size_name: r.size || r.size_name,
+      size_name: r.size_name || r.size,
       delivery_stock: r.delivery_stock,
       store_stock: r.store_stock,
       wholesale_stock: r.wholesale_stock,
       serie_composition: r.serie_composition,
     }));
 
-    let { error: err1 } = await supabase.from('product_variants').insert(fallbackRows1);
+    let { error: err1 } = await supabase.from('product_variants').insert(rowsWithSizeNameOnly);
     if (!err1) return true;
 
-    const fallbackRows2 = rows.map((r) => ({
+    // Strategy 2: Insert with BOTH size AND size_name
+    const rowsWithBoth = rows.map((r) => ({
       product_id: r.product_id,
       color_name: r.color_name,
+      color_image_url: r.color_image_url,
       size: r.size || r.size_name,
+      size_name: r.size_name || r.size,
+      delivery_stock: r.delivery_stock,
+      store_stock: r.store_stock,
+      wholesale_stock: r.wholesale_stock,
+      serie_composition: r.serie_composition,
+    }));
+
+    let { error: err2 } = await supabase.from('product_variants').insert(rowsWithBoth);
+    if (!err2) return true;
+
+    // Strategy 3: Basic columns with size_name
+    const rowsBasic = rows.map((r) => ({
+      product_id: r.product_id,
+      color_name: r.color_name,
+      size_name: r.size_name || r.size,
       delivery_stock: r.delivery_stock,
       store_stock: r.store_stock,
       wholesale_stock: r.wholesale_stock,
     }));
 
-    let { error: err2 } = await supabase.from('product_variants').insert(fallbackRows2);
-    if (!err2) return true;
+    let { error: err3 } = await supabase.from('product_variants').insert(rowsBasic);
+    if (!err3) return true;
 
-    console.error('All variant insert attempts failed:', err2);
-    alert('خطأ في حفظ متغيرات المنتج: ' + (err2.message || JSON.stringify(err2)));
+    console.error('All variant insert attempts failed:', err3);
+    alert('خطأ في حفظ متغيرات المنتج: ' + (err3.message || JSON.stringify(err3)));
     return false;
   };
 
