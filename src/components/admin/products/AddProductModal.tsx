@@ -95,7 +95,7 @@ export default function AddProductModal({
   const [supplierPhone, setSupplierPhone] = useState('');
   const [sku, setSku] = useState('');
 
-  // Pricing State (DZD)
+  // Pricing State (DZD) - bulk_price mapped strictly
   const [costPrice, setCostPrice] = useState<number | ''>('');
   const [sellingPrice, setSellingPrice] = useState<number | ''>('');
   const [oldPrice, setOldPrice] = useState<number | ''>('');
@@ -225,7 +225,7 @@ export default function AddProductModal({
     fetchData();
   }, [isOpen]);
 
-  // Pre-fill Edit Mode Data vs Clean Reset for New Product
+  // Pre-fill Edit Mode Data with Unified bulk_price Hydration
   useEffect(() => {
     if (!isOpen) return;
 
@@ -238,7 +238,16 @@ export default function AddProductModal({
       setCostPrice(productToEdit.costPrice ?? '');
       setSellingPrice(productToEdit.sellingPrice ?? '');
       setOldPrice(productToEdit.oldPrice ?? '');
-      setBulkDiscountPrice5(productToEdit.bulkDiscountPrice5 ?? (productToEdit as any).bulk_discount_price_5 ?? '');
+
+      // Unified bulk_price hydration from all potential DB aliases
+      const bulkPriceVal =
+        (productToEdit as any).bulk_price ??
+        (productToEdit as any).bulkPrice ??
+        productToEdit.bulkDiscountPrice5 ??
+        (productToEdit as any).bulk_discount_price_5 ??
+        '';
+      setBulkDiscountPrice5(bulkPriceVal);
+
       setWholesalePrice(productToEdit.wholesalePrice ?? '');
       setSuperGrosPrice(productToEdit.superGrosPrice ?? '');
       setMinWholesaleSeries(productToEdit.minWholesaleSeries ?? 1);
@@ -715,10 +724,34 @@ export default function AddProductModal({
       if (!result.error && result.data) return result;
     }
 
-    // Fallback 3: Remove bulk_discount_price_5 if column doesn't exist in DB schema
+    // Fallback 3: Try bulk_price only vs bulk_discount_price_5 only
+    if (result.error && ('bulk_price' in payload || 'bulk_discount_price_5' in payload)) {
+      console.warn('Retrying insert/update with bulk_price only...');
+      const payloadBulkPriceOnly = { ...payload };
+      delete payloadBulkPriceOnly.bulk_discount_price_5;
+
+      result = targetProductId
+        ? await supabase.from('products').update(payloadBulkPriceOnly).eq('id', targetProductId).select().single()
+        : await supabase.from('products').insert([payloadBulkPriceOnly]).select().single();
+
+      if (!result.error && result.data) return result;
+
+      console.warn('Retrying insert/update with bulk_discount_price_5 only...');
+      const payloadBulkDiscountOnly = { ...payload };
+      delete payloadBulkDiscountOnly.bulk_price;
+
+      result = targetProductId
+        ? await supabase.from('products').update(payloadBulkDiscountOnly).eq('id', targetProductId).select().single()
+        : await supabase.from('products').insert([payloadBulkDiscountOnly]).select().single();
+
+      if (!result.error && result.data) return result;
+    }
+
+    // Fallback 4: Remove optional schema columns
     if (result.error) {
       console.warn('Retrying insert/update without optional schema columns...');
       const payloadNoOptional = { ...payload };
+      delete payloadNoOptional.bulk_price;
       delete payloadNoOptional.bulk_discount_price_5;
       delete payloadNoOptional.size_category;
 
@@ -729,7 +762,7 @@ export default function AddProductModal({
       if (!result.error && result.data) return result;
     }
 
-    // Fallback 4: Essential core fields ONLY
+    // Fallback 5: Essential core fields ONLY
     if (result.error) {
       console.warn('Retrying with standard core fields...');
       const corePayload: Record<string, any> = {
@@ -808,7 +841,9 @@ export default function AddProductModal({
         productPayload.supplier_phone = supplierPhone.trim() || null;
         productPayload.selling_price = Number(sellingPrice) || 0;
         productPayload.old_price = oldPrice !== '' ? Number(oldPrice) : null;
-        productPayload.bulk_discount_price_5 = bulkDiscountPrice5 !== '' ? Number(bulkDiscountPrice5) : null;
+        const bVal = bulkDiscountPrice5 !== '' ? Number(bulkDiscountPrice5) : null;
+        productPayload.bulk_price = bVal;
+        productPayload.bulk_discount_price_5 = bVal;
       }
 
       if (activeWarehouse === 'WHOLESALE') {
@@ -862,6 +897,8 @@ export default function AddProductModal({
           });
         });
       });
+
+      const bVal = bulkDiscountPrice5 !== '' ? Number(bulkDiscountPrice5) : null;
 
       if (isEditMode && productToEdit) {
         // UPDATE existing product with resilience
@@ -918,7 +955,9 @@ export default function AddProductModal({
           updatedProdObj.supplierPhone = supplierPhone.trim() || undefined;
           updatedProdObj.sellingPrice = Number(sellingPrice) || 0;
           updatedProdObj.oldPrice = oldPrice !== '' ? Number(oldPrice) : null;
-          updatedProdObj.bulkDiscountPrice5 = bulkDiscountPrice5 !== '' ? Number(bulkDiscountPrice5) : null;
+          updatedProdObj.bulkPrice = bVal;
+          updatedProdObj.bulk_price = bVal;
+          updatedProdObj.bulkDiscountPrice5 = bVal;
         }
 
         if (activeWarehouse === 'WHOLESALE') {
@@ -986,7 +1025,9 @@ export default function AddProductModal({
           costPrice: Number(costPrice) || 0,
           sellingPrice: Number(sellingPrice) || 0,
           oldPrice: oldPrice !== '' ? Number(oldPrice) : null,
-          bulkDiscountPrice5: bulkDiscountPrice5 !== '' ? Number(bulkDiscountPrice5) : null,
+          bulkPrice: bVal,
+          bulk_price: bVal,
+          bulkDiscountPrice5: bVal,
           wholesalePrice: wholesalePrice !== '' ? Number(wholesalePrice) : null,
           superGrosPrice: superGrosPrice !== '' ? Number(superGrosPrice) : null,
           unitsPerSerie: firstColorTotalItemsInSerie,
@@ -1241,6 +1282,7 @@ export default function AddProductModal({
                     />
                   </div>
 
+                  {/* Strictly Mapped to bulk_price */}
                   <div>
                     <label className="block text-xs font-bold text-[#8A2B43] mb-1">
                       سعر 5 حبات فما فوق
