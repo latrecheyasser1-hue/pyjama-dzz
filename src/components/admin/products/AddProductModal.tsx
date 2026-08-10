@@ -663,47 +663,88 @@ export default function AddProductModal({
     return false;
   };
 
-  // Resilient Product Insert/Update Helper with Schema Cache & Unique SKU Constraint Fallbacks
+  // Ultra-Resilient Product Insert/Update Helper with Multi-Stage Fallbacks for Column Differences
   const insertOrUpdateProductWithResilience = async (
     payload: Record<string, any>,
     targetProductId?: string
   ): Promise<{ data: any; error: any }> => {
+    // Attempt 1: Full payload with select
     let result: { data: any; error: any } = targetProductId
       ? await supabase.from('products').update(payload).eq('id', targetProductId).select().single()
       : await supabase.from('products').insert([payload]).select().single();
 
+    if (!result.error && result.data) return result;
+
+    // Attempt 1b: Full payload without .single() if select single fails
+    if (result.error) {
+      let retryNoSingle = targetProductId
+        ? await supabase.from('products').update(payload).eq('id', targetProductId).select()
+        : await supabase.from('products').insert([payload]).select();
+
+      if (!retryNoSingle.error && retryNoSingle.data && retryNoSingle.data.length > 0) {
+        return { data: retryNoSingle.data[0], error: null };
+      }
+    }
+
     // Fallback 1: Duplicate SKU Key Constraint Violation
-    if (
-      result.error &&
-      (result.error.message?.includes('products_sku_key') ||
-        result.error.message?.includes('duplicate key value') ||
-        result.error.details?.includes('products_sku_key'))
-    ) {
+    const errMsg = result.error?.message || result.error?.details || JSON.stringify(result.error || {});
+    if (errMsg.includes('products_sku_key') || errMsg.includes('duplicate key value')) {
       console.warn('Duplicate SKU detected. Generating unique SKU suffix and retrying...');
-      const fallbackPayload = {
+      const payloadNewSku = {
         ...payload,
         sku: `${payload.sku || 'PYJ'}-${Date.now().toString().slice(-4)}${Math.floor(100 + Math.random() * 900)}`,
       };
 
       result = targetProductId
-        ? await supabase.from('products').update(fallbackPayload).eq('id', targetProductId).select().single()
-        : await supabase.from('products').insert([fallbackPayload]).select().single();
+        ? await supabase.from('products').update(payloadNewSku).eq('id', targetProductId).select().single()
+        : await supabase.from('products').insert([payloadNewSku]).select().single();
+
+      if (!result.error && result.data) return result;
     }
 
-    // Fallback 2: Missing bulk_discount_price_5 Column Schema Cache Exception
-    if (
-      result.error &&
-      (result.error.message?.includes('bulk_discount_price_5') ||
-        result.error.message?.includes('schema cache') ||
-        result.error.details?.includes('bulk_discount_price_5'))
-    ) {
-      console.warn('Schema cache notice for bulk_discount_price_5. Retrying without column...');
-      const fallbackPayload = { ...payload };
-      delete fallbackPayload.bulk_discount_price_5;
+    // Fallback 2: Remove size_category if column doesn't exist in DB schema
+    if (result.error && 'size_category' in payload) {
+      console.warn('Retrying insert/update without size_category column...');
+      const payloadNoSizeCat = { ...payload };
+      delete payloadNoSizeCat.size_category;
 
       result = targetProductId
-        ? await supabase.from('products').update(fallbackPayload).eq('id', targetProductId).select().single()
-        : await supabase.from('products').insert([fallbackPayload]).select().single();
+        ? await supabase.from('products').update(payloadNoSizeCat).eq('id', targetProductId).select().single()
+        : await supabase.from('products').insert([payloadNoSizeCat]).select().single();
+
+      if (!result.error && result.data) return result;
+    }
+
+    // Fallback 3: Remove bulk_discount_price_5 if column doesn't exist in DB schema
+    if (result.error) {
+      console.warn('Retrying insert/update without optional schema columns...');
+      const payloadNoOptional = { ...payload };
+      delete payloadNoOptional.bulk_discount_price_5;
+      delete payloadNoOptional.size_category;
+
+      result = targetProductId
+        ? await supabase.from('products').update(payloadNoOptional).eq('id', targetProductId).select().single()
+        : await supabase.from('products').insert([payloadNoOptional]).select().single();
+
+      if (!result.error && result.data) return result;
+    }
+
+    // Fallback 4: Essential core fields ONLY
+    if (result.error) {
+      console.warn('Retrying with standard core fields...');
+      const corePayload: Record<string, any> = {
+        name: payload.name,
+        sku: payload.sku,
+        category_id: payload.category_id || null,
+        cost_price: payload.cost_price || 0,
+        selling_price: payload.selling_price || 0,
+        description: payload.description || null,
+        image_url: payload.image_url || null,
+      };
+
+      result = targetProductId
+        ? await supabase.from('products').update(corePayload).eq('id', targetProductId).select().single()
+        : await supabase.from('products').insert([corePayload]).select().single();
     }
 
     return result;
@@ -830,8 +871,9 @@ export default function AddProductModal({
         );
 
         if (productError) {
+          const errDetail = productError.message || productError.details || productError.hint || JSON.stringify(productError);
           console.error('Products Update Error:', productError);
-          alert('خطأ في حفظ وتعديل المنتج في قاعدة البيانات: ' + (productError.message || JSON.stringify(productError)));
+          alert('خطأ في حفظ وتعديل المنتج في قاعدة البيانات: ' + (errDetail !== '{}' ? errDetail : 'تأكد من الاتصال بالشبكة'));
           setIsSubmitting(false);
           return;
         }
@@ -906,8 +948,9 @@ export default function AddProductModal({
         );
 
         if (productError) {
+          const errDetail = productError.message || productError.details || productError.hint || JSON.stringify(productError);
           console.error('Products Insert Error:', productError);
-          alert('خطأ في حفظ المنتج في قاعدة البيانات: ' + (productError.message || JSON.stringify(productError)));
+          alert('خطأ في حفظ المنتج في قاعدة البيانات: ' + (errDetail !== '{}' ? errDetail : 'تأكد من الاتصال بالشبكة'));
           setIsSubmitting(false);
           return;
         }
