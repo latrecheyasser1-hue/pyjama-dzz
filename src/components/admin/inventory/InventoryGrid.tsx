@@ -66,7 +66,7 @@ export default function InventoryGrid({
   products.forEach((p) => {
     if (hasStockInActiveWarehouse(p)) {
       const catId = p.categoryId || 'uncategorized';
-      const catName = p.categoryNameAr || 'أقسان عامة';
+      const catName = p.categoryNameAr || 'أقسام عامة';
       if (!categoryStatsMap[catId]) {
         categoryStatsMap[catId] = {
           id: catId,
@@ -94,21 +94,47 @@ export default function InventoryGrid({
   const activeCategoryName =
     categoryCardsList.find((c) => c.id === selectedCategoryId)?.name || 'القسم المحدد';
 
-  // Explicit Direct Delete Action Handler
+  // Strict Sequential Delete Handler (Deletes variants first to prevent Foreign Key constraints)
   const handleDeleteProduct = async (productId: string, e: React.MouseEvent) => {
-    e.stopPropagation(); // Prevent opening Edit Modal on card click
-    if (confirm('هل أنت تأكد من رغبتك في حذف هذا المنتج نهائياً؟')) {
-      if (onDeleteProduct) {
-        await onDeleteProduct(productId, activeStockTab);
-      } else {
-        const { error } = await supabase.from('products').delete().eq('id', productId);
-        if (error) {
-          alert('خطأ أثناء الحذف: ' + error.message);
-        }
+    e.stopPropagation(); // Prevents triggering card edit modal
+
+    if (!confirm('هل أنت تأكد من رغبتك في حذف هذا المنتج وكل ألوانه ومقاساته نهائياً؟')) {
+      return;
+    }
+
+    try {
+      // 1. Delete child records in product_variants first (to avoid FK constraint blocks)
+      const { error: variantErr } = await supabase
+        .from('product_variants')
+        .delete()
+        .eq('product_id', productId);
+
+      if (variantErr) {
+        console.error('Error deleting variants:', variantErr);
       }
-      if (reFetchProducts) {
+
+      // 2. Delete parent record in products table
+      const { error: productErr } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', productId);
+
+      if (productErr) {
+        alert('تعذر حذف المنتج من قاعدة البيانات: ' + productErr.message);
+        console.error('Delete Product Error:', productErr);
+        return;
+      }
+
+      alert('تم حذف المنتج بنجاح!');
+
+      // 3. Force re-fetch/refresh state
+      if (typeof reFetchProducts === 'function') {
         await reFetchProducts();
+      } else {
+        window.location.reload();
       }
+    } catch (err: any) {
+      alert('حدث خطأ أثناء الحذف: ' + (err?.message || String(err)));
     }
   };
 
