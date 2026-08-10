@@ -1071,7 +1071,7 @@ export default function AddProductModal({
 
                   <div>
                     <label className="block text-xs font-bold text-[#8A2B43] mb-1">
-                      سعر القطعة عند شراء 5 حبات فما فوق (5+ Units Volume Price DZD)
+                      سعر 5 حبات فما فوق
                     </label>
                     <input
                       type="number"
