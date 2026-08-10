@@ -11,9 +11,6 @@ import {
   TrendingUp,
   History,
   Settings,
-  Lock,
-  LogOut,
-  ChevronLeft,
   X
 } from 'lucide-react';
 import { DashboardSection } from '@/types/admin';
@@ -22,8 +19,6 @@ interface AdminSidebarProps {
   activeSection: DashboardSection;
   onSelectSection: (section: DashboardSection) => void;
   unconfirmedCount: number;
-  onOpenPinChangeModal: () => void;
-  onLock: () => void;
   isMobileOpen: boolean;
   onCloseMobile: () => void;
 }
@@ -32,8 +27,6 @@ export default function AdminSidebar({
   activeSection,
   onSelectSection,
   unconfirmedCount,
-  onOpenPinChangeModal,
-  onLock,
   isMobileOpen,
   onCloseMobile,
 }: AdminSidebarProps) {
@@ -130,7 +123,7 @@ export default function AdminSidebar({
           </div>
 
           {/* Navigation Links */}
-          <nav className="p-4 space-y-1.5 overflow-y-auto max-h-[calc(100vh-220px)]">
+          <nav className="p-4 space-y-1.5 overflow-y-auto max-h-[calc(100vh-140px)]">
             {menuItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeSection === item.id;
@@ -176,26 +169,11 @@ export default function AdminSidebar({
           </nav>
         </div>
 
-        {/* Footer Actions */}
-        <div className="p-4 border-t border-white/10 space-y-2 bg-[#581223]/50">
-          <button
-            onClick={onOpenPinChangeModal}
-            className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-semibold text-white/80 hover:text-white hover:bg-white/10 transition-all"
-          >
-            <div className="flex items-center gap-2.5">
-              <Lock className="w-4 h-4 text-[#E8A5B8]" />
-              <span>تغيير رمز الأمان (Admin PIN)</span>
-            </div>
-            <ChevronLeft className="w-4 h-4 text-white/40" />
-          </button>
-
-          <button
-            onClick={onLock}
-            className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-rose-200 bg-rose-950/40 border border-rose-500/20 hover:bg-rose-900/60 transition-all shadow-sm"
-          >
-            <LogOut className="w-4 h-4 text-rose-400" />
-            <span>قفل لوحة التحكم (Lock ERP)</span>
-          </button>
+        {/* Clean Footer Branding */}
+        <div className="p-4 border-t border-white/10 bg-[#581223]/50 text-center">
+          <p className="text-[11px] text-[#E8A5B8] font-medium font-sans">
+            بيجاما ديزاين • لوحة التحكم الرئيسيّة
+          </p>
         </div>
       </aside>
     </>

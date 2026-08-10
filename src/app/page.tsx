@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
-import { Menu, Lock } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import PinLockScreen from '@/components/admin/PinLockScreen';
 import PinChangeModal from '@/components/admin/PinChangeModal';
 import AdminSidebar from '@/components/admin/AdminSidebar';
@@ -372,8 +372,6 @@ export default function MasterAdminPage() {
         activeSection={activeSection}
         onSelectSection={setActiveSection}
         unconfirmedCount={unconfirmedOrders.length}
-        onOpenPinChangeModal={() => setIsPinModalOpen(true)}
-        onLock={() => setIsLocked(true)}
         isMobileOpen={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
       />
@@ -406,18 +404,6 @@ export default function MasterAdminPage() {
                 لوحة التحكم الإدارية ERP • بيجاما ديزاين الشلف ({settings.addressWilaya})
               </p>
             </div>
-          </div>
-
-          {/* Clean Right Controls: Lock Screen Button Only */}
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setIsLocked(true)}
-              className="p-2.5 rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition-all text-xs font-bold flex items-center gap-1.5"
-              title="قفل الشاشة"
-            >
-              <Lock className="w-4 h-4" />
-              <span className="hidden sm:inline">قفل</span>
-            </button>
           </div>
         </header>
 
