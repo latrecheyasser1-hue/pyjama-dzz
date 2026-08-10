@@ -450,6 +450,50 @@ export default function AddProductModal({
     return null;
   };
 
+  // Ultra-resilient variant insertion helper with fallback strategies
+  const insertVariantsWithResilience = async (rows: any[]): Promise<boolean> => {
+    if (rows.length === 0) return true;
+
+    // Strategy 1: Try full insert
+    let { error } = await supabase.from('product_variants').insert(rows);
+    if (!error) return true;
+
+    console.warn('Full variant insert notice, attempting fallback 1 (size_name):', error.message);
+
+    // Strategy 2: Fallback to size_name
+    const fallbackRows1 = rows.map((r) => ({
+      product_id: r.product_id,
+      color_name: r.color_name,
+      color_image_url: r.color_image_url,
+      size_name: r.size || r.size_name,
+      delivery_stock: r.delivery_stock,
+      store_stock: r.store_stock,
+      wholesale_stock: r.wholesale_stock,
+    }));
+
+    let { error: err1 } = await supabase.from('product_variants').insert(fallbackRows1);
+    if (!err1) return true;
+
+    console.warn('Fallback 1 notice, attempting fallback 2 (size):', err1.message);
+
+    // Strategy 3: Fallback to size
+    const fallbackRows2 = rows.map((r) => ({
+      product_id: r.product_id,
+      color_name: r.color_name,
+      size: r.size || r.size_name,
+      delivery_stock: r.delivery_stock,
+      store_stock: r.store_stock,
+      wholesale_stock: r.wholesale_stock,
+    }));
+
+    let { error: err2 } = await supabase.from('product_variants').insert(fallbackRows2);
+    if (!err2) return true;
+
+    console.error('All variant insert attempts failed:', err2);
+    alert('خطأ في حفظ متغيرات المنتج: ' + (err2.message || JSON.stringify(err2)));
+    return false;
+  };
+
   // Synchronous Supabase Insert/Update with Explicit Error alerts & toasts
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -542,34 +586,10 @@ export default function AddProductModal({
           });
         });
 
-        if (variantRows.length > 0) {
-          let { error: variantError } = await supabase
-            .from('product_variants')
-            .insert(variantRows);
-
-          // Fallback if schema does not have optional columns yet
-          if (variantError) {
-            console.warn('First variant insert attempt notice, trying fallback core fields:', variantError.message);
-            const fallbackRows = variantRows.map((r) => ({
-              product_id: r.product_id,
-              color_name: r.color_name,
-              size: r.size,
-              delivery_stock: r.delivery_stock,
-              store_stock: r.store_stock,
-              wholesale_stock: r.wholesale_stock,
-            }));
-
-            const { error: fallbackError } = await supabase
-              .from('product_variants')
-              .insert(fallbackRows);
-
-            if (fallbackError) {
-              console.error('Variants Update Insert Error:', fallbackError);
-              alert('خطأ في حفظ متغيرات المنتج: ' + (fallbackError.message || JSON.stringify(fallbackError)));
-              setIsSubmitting(false);
-              return;
-            }
-          }
+        const success = await insertVariantsWithResilience(variantRows);
+        if (!success) {
+          setIsSubmitting(false);
+          return;
         }
 
         const updatedProdObj: Product = {
@@ -638,34 +658,10 @@ export default function AddProductModal({
             });
           });
 
-          if (variantRows.length > 0) {
-            let { error: variantError } = await supabase
-              .from('product_variants')
-              .insert(variantRows);
-
-            // Fallback if schema does not have optional columns yet
-            if (variantError) {
-              console.warn('First variant insert attempt notice, trying fallback core fields:', variantError.message);
-              const fallbackRows = variantRows.map((r) => ({
-                product_id: r.product_id,
-                color_name: r.color_name,
-                size: r.size,
-                delivery_stock: r.delivery_stock,
-                store_stock: r.store_stock,
-                wholesale_stock: r.wholesale_stock,
-              }));
-
-              const { error: fallbackError } = await supabase
-                .from('product_variants')
-                .insert(fallbackRows);
-
-              if (fallbackError) {
-                console.error('Variants Insert Error:', fallbackError);
-                alert('خطأ في حفظ متغيرات المنتج: ' + (fallbackError.message || JSON.stringify(fallbackError)));
-                setIsSubmitting(false);
-                return;
-              }
-            }
+          const success = await insertVariantsWithResilience(variantRows);
+          if (!success) {
+            setIsSubmitting(false);
+            return;
           }
         }
 
