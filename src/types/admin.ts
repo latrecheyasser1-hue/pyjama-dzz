@@ -78,6 +78,8 @@ export interface ProductVariant {
   productId: string;
   size: string;
   color: string;
+  color_image_url?: string;
+  colorImageUrl?: string;
   deliveryStock: number;  // مخزون التوصيل
   storeStock: number;     // مخزون المحل
   wholesaleStock: number; // مخزون الجملة
