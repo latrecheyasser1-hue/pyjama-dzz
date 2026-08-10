@@ -104,7 +104,7 @@ export default function OrderDetailsModal({
 
         {/* Customer / Trader Section */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-pyjama-cream/60 p-4 rounded-2xl border border-gray-200">
-          <div className="space-y-1.5">
+          <div className="space-y-2">
             <span className="text-[11px] font-bold text-gray-400 block">
               {isWholesale ? 'بيانات التاجر / المحل' : 'بيانات الزبون'}
             </span>
@@ -118,9 +118,17 @@ export default function OrderDetailsModal({
                 <span>المحل: {order.traderBusinessName}</span>
               </div>
             )}
-            <div className="flex items-center gap-2 text-xs font-mono text-gray-600">
-              <Phone className="w-3.5 h-3.5 text-[#8A2B43]" />
-              <span>{order.customerPhone}</span>
+            
+            {/* Click-to-Call Phone Number */}
+            <div className="pt-1">
+              <a
+                href={`tel:${order.customerPhone}`}
+                className="inline-flex items-center gap-2 text-xs font-mono font-bold text-[#8A2B43] hover:text-[#7A1C32] hover:underline bg-pyjama-pink-soft/80 px-3 py-1.5 rounded-xl border border-pyjama-pink/40 shadow-sm transition-all"
+                title="إجراء اتصال مباشر (Click to Call)"
+              >
+                <Phone className="w-3.5 h-3.5" />
+                <span>{order.customerPhone}</span>
+              </a>
             </div>
           </div>
 

@@ -11,7 +11,6 @@ import {
   Eye,
   Check,
   X,
-  CreditCard,
 } from 'lucide-react';
 import { DetailedOrder, OrderType } from '@/types/orders';
 import OrderDetailsModal from '../OrderDetailsModal';
@@ -149,7 +148,7 @@ export default function NewOrdersTicker({
               <thead className="bg-pyjama-cream/80 text-pyjama-charcoal font-bold border-b border-gray-200">
                 <tr>
                   <th className="py-4 px-5">رقم الطلب والتاريخ</th>
-                  <th className="py-4 px-5">اسم الزبون والهاتف</th>
+                  <th className="py-4 px-5">اسم الزبون والهاتف (Click to Call)</th>
                   <th className="py-4 px-5">الولاية والبلدية</th>
                   <th className="py-4 px-5">نوع الاستلام والشاحن</th>
                   <th className="py-4 px-5">ملخص القطع (Items)</th>
@@ -173,9 +172,15 @@ export default function NewOrdersTicker({
 
                     <td className="py-4 px-5 font-bold text-pyjama-charcoal">
                       <div>{o.customerName}</div>
-                      <div className="flex items-center gap-1 text-[11px] text-gray-500 font-mono mt-0.5">
-                        <Phone className="w-3 h-3 text-[#8A2B43]" />
-                        <span>{o.customerPhone}</span>
+                      <div className="mt-1" onClick={(e) => e.stopPropagation()}>
+                        <a
+                          href={`tel:${o.customerPhone}`}
+                          className="inline-flex items-center gap-1 text-[11px] font-mono font-bold text-[#8A2B43] hover:text-[#7A1C32] hover:underline bg-pyjama-pink-soft px-2 py-0.5 rounded-md border border-pyjama-pink/40"
+                          title="اتصال مباشر (Click to Call)"
+                        >
+                          <Phone className="w-3 h-3 text-[#8A2B43]" />
+                          <span>{o.customerPhone}</span>
+                        </a>
                       </div>
                     </td>
 
@@ -252,7 +257,7 @@ export default function NewOrdersTicker({
                 <tr>
                   <th className="py-4 px-5">رقم الطلب والتاريخ</th>
                   <th className="py-4 px-5">اسم التاجر / المحل</th>
-                  <th className="py-4 px-5">الهاتف والولاية</th>
+                  <th className="py-4 px-5">الهاتف والولاية (Click to Call)</th>
                   <th className="py-4 px-5">إجمالي عدد القطع / السلاسل</th>
                   <th className="py-4 px-5">حالة الدفع (Payment Status)</th>
                   <th className="py-4 px-5">المبلغ الإجمالي للجملة (DZD)</th>
@@ -286,11 +291,15 @@ export default function NewOrdersTicker({
                     </td>
 
                     <td className="py-4 px-5">
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-1 font-mono text-gray-700">
+                      <div className="space-y-1" onClick={(e) => e.stopPropagation()}>
+                        <a
+                          href={`tel:${o.customerPhone}`}
+                          className="inline-flex items-center gap-1 font-mono text-[11px] font-bold text-purple-900 hover:text-purple-700 hover:underline bg-purple-100 px-2 py-0.5 rounded-md border border-purple-200"
+                          title="اتصال مباشر (Click to Call)"
+                        >
                           <Phone className="w-3 h-3 text-purple-800" />
                           <span>{o.customerPhone}</span>
-                        </div>
+                        </a>
                         <div className="text-[11px] text-gray-500 font-bold">
                           {o.wilaya}
                         </div>
