@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import {
   X,
   Plus,
+  Minus,
   Trash2,
   Package,
   Wand2,
@@ -73,7 +74,7 @@ interface ColorInputItem {
   storeStocks: Record<string, number>;
   wholesaleStocks: Record<string, number>;
   // Wholesale Serie Composition per Color
-  serieComposition: Record<string, number>; // { XS: 1, S: 2, M: 2, L: 2, XL: 2 }
+  serieComposition: Record<string, number>;
   activeSizes: string[];
 }
 
@@ -112,7 +113,7 @@ export default function AddProductModal({
   const [minSize, setMinSize] = useState('S');
   const [maxSize, setMaxSize] = useState('XL');
 
-  // Color Variants State - Default to Neutral/Blank Color State
+  // Color Variants State - Default Neutral Blank State
   const [colors, setColors] = useState<ColorInputItem[]>([
     {
       id: 'c-1',
@@ -346,7 +347,30 @@ export default function AddProductModal({
     setSku(`PYJ-${timestampSuffix}${randomNum}`);
   };
 
-  // Helper to calculate sizes array
+  // Size Category Change with Strict Filtering & Active Size Reset
+  const handleSizeCategoryChange = (catKey: SizeCategoryKey) => {
+    setSizeCategory(catKey);
+    setIsStandardSize(false);
+    const availableSizes = SIZE_CATEGORIES[catKey].sizes;
+    const newMin = availableSizes[0];
+    const newMax = availableSizes[Math.min(3, availableSizes.length - 1)];
+    setMinSize(newMin);
+    setMaxSize(newMax);
+
+    const defaultSizes = availableSizes.slice(0, 4);
+
+    setColors((prev) =>
+      prev.map((c) => {
+        const nextActive = c.activeSizes.filter((s) => availableSizes.includes(s));
+        return {
+          ...c,
+          activeSizes: nextActive.length > 0 ? nextActive : [...defaultSizes],
+        };
+      })
+    );
+  };
+
+  // Helper to calculate sizes array bound strictly to active category
   const getGeneratedSizes = (): string[] => {
     if (isStandardSize) {
       return ['Standard / Free Size'];
@@ -357,21 +381,12 @@ export default function AddProductModal({
     const maxIndex = currentSizes.indexOf(maxSize);
 
     if (minIndex === -1 || maxIndex === -1 || minIndex > maxIndex) {
-      return [minSize];
+      return [currentSizes[0] || 'S'];
     }
     return currentSizes.slice(minIndex, maxIndex + 1);
   };
 
   const generatedSizesList = getGeneratedSizes();
-
-  // Size Category Change
-  const handleSizeCategoryChange = (catKey: SizeCategoryKey) => {
-    setSizeCategory(catKey);
-    setIsStandardSize(false);
-    const availableSizes = SIZE_CATEGORIES[catKey].sizes;
-    setMinSize(availableSizes[0]);
-    setMaxSize(availableSizes[Math.min(3, availableSizes.length - 1)]);
-  };
 
   // Toggle Standard Size
   const handleToggleStandardSize = () => {
@@ -1220,7 +1235,7 @@ export default function AddProductModal({
             </div>
           )}
 
-          {/* SECTION D: Flexible Size Selection System */}
+          {/* SECTION D: Strict Size Category Selection System */}
           <div className="space-y-5 bg-pyjama-cream/40 p-5 rounded-3xl border border-gray-100">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-gray-200/80 pb-3">
               <h3 className="text-sm font-bold text-[#7A1C32] flex items-center gap-2">
@@ -1322,7 +1337,7 @@ export default function AddProductModal({
             </div>
           </div>
 
-          {/* SECTION E: Dynamic Color Variants & Wholesale Série Composition */}
+          {/* SECTION E: Dynamic Color Variants & Interactive [+] / [-] Stock Quantity Controls */}
           <div className="space-y-6 bg-pyjama-cream/40 p-5 rounded-3xl border border-gray-100">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-gray-200/80 pb-3">
               <h3 className="text-sm font-bold text-[#7A1C32] flex items-center gap-2">
@@ -1344,6 +1359,7 @@ export default function AddProductModal({
             <div className="space-y-6">
               {colors.map((colorItem, index) => {
                 const totalSerieItems = getSerieTotalItems(colorItem);
+                const isCustomColorHex = colorItem.colorHex && colorItem.colorHex !== '#ffffff';
 
                 return (
                   <div
@@ -1357,12 +1373,17 @@ export default function AddProductModal({
                           {index + 1}
                         </span>
 
-                        {/* Color Circle Badge - Neutral Blank State */}
+                        {/* Dynamic Color Circle Badge Preview */}
                         <div
-                          className="w-8 h-8 rounded-full border-2 border-gray-200 shadow-sm shrink-0 transition-transform hover:scale-110"
-                          style={{ backgroundColor: colorItem.colorHex || '#ffffff' }}
-                          title={colorItem.colorHex ? `الدرجة المحددة: ${colorItem.colorHex}` : 'لم يتم تحديد درجة اللون بعد'}
-                        />
+                          className="w-8 h-8 rounded-full border-2 shadow-sm shrink-0 transition-transform hover:scale-110 flex items-center justify-center"
+                          style={{
+                            backgroundColor: isCustomColorHex ? colorItem.colorHex : 'transparent',
+                            borderColor: isCustomColorHex ? '#ffffff' : '#d1d5db',
+                          }}
+                          title={isCustomColorHex ? `الدرجة المحددة: ${colorItem.colorHex}` : 'لم يتم تحديد درجة اللون بعد'}
+                        >
+                          {!isCustomColorHex && <Palette className="w-4 h-4 text-gray-400" />}
+                        </div>
 
                         {/* Color Name Input */}
                         <input
@@ -1388,7 +1409,7 @@ export default function AddProductModal({
                             type="button"
                             onClick={() => handlePickColor(colorItem.id)}
                             className="p-2.5 rounded-xl bg-pyjama-pink-soft text-[#8A2B43] hover:bg-[#8A2B43] hover:text-white transition-all shadow-sm"
-                            title="التقاط درجة اللون مباشرة من الصورة"
+                            title="التقاط درجة اللون مباشرة من الصورة (EyeDropper)"
                           >
                             <Pipette className="w-4 h-4" />
                           </button>
@@ -1480,7 +1501,7 @@ export default function AddProductModal({
                           </span>
                         </div>
 
-                        {/* Breakdown per size inside 1 Série */}
+                        {/* Breakdown per size inside 1 Série with [+] / [-] buttons */}
                         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
                           {generatedSizesList.map((size) => {
                             const isActive = colorItem.activeSizes.includes(size);
@@ -1514,19 +1535,47 @@ export default function AddProductModal({
                                 {isActive && (
                                   <div className="w-full flex flex-col items-center gap-1 mt-0.5">
                                     <span className="text-[10px] font-bold text-purple-900">قطع/سلسلة:</span>
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      value={currentSizeCountInSerie}
-                                      onChange={(e) =>
-                                        handleUpdateSerieSizeComposition(
-                                          colorItem.id,
-                                          size,
-                                          parseInt(e.target.value) || 0
-                                        )
-                                      }
-                                      className="w-12 text-center py-1 bg-purple-50 rounded-lg border border-purple-200 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-purple-800"
-                                    />
+                                    <div className="w-full flex items-center justify-center gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          handleUpdateSerieSizeComposition(
+                                            colorItem.id,
+                                            size,
+                                            Math.max(0, currentSizeCountInSerie - 1)
+                                          )
+                                        }
+                                        className="w-5 h-5 rounded-md bg-purple-100 hover:bg-purple-800 hover:text-white text-purple-900 font-bold flex items-center justify-center text-xs transition-colors shrink-0"
+                                      >
+                                        -
+                                      </button>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        value={currentSizeCountInSerie}
+                                        onChange={(e) =>
+                                          handleUpdateSerieSizeComposition(
+                                            colorItem.id,
+                                            size,
+                                            parseInt(e.target.value) || 0
+                                          )
+                                        }
+                                        className="w-10 text-center py-0.5 bg-white rounded-md border border-purple-200 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-purple-800"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          handleUpdateSerieSizeComposition(
+                                            colorItem.id,
+                                            size,
+                                            currentSizeCountInSerie + 1
+                                          )
+                                        }
+                                        className="w-5 h-5 rounded-md bg-purple-100 hover:bg-purple-800 hover:text-white text-purple-900 font-bold flex items-center justify-center text-xs transition-colors shrink-0"
+                                      >
+                                        +
+                                      </button>
+                                    </div>
                                   </div>
                                 )}
                               </div>
@@ -1535,7 +1584,7 @@ export default function AddProductModal({
                         </div>
                       </div>
                     ) : (
-                      /* RETAIL (DELIVERY / STORE) STOCK QUANTITIES PER SIZE */
+                      /* RETAIL (DELIVERY / STORE) STOCK QUANTITIES PER SIZE WITH INLINE [+] / [-] CONTROLS */
                       <div className="space-y-3 pt-2 border-t border-gray-100">
                         <div className="flex items-center justify-between">
                           <span className="text-xs font-bold text-gray-700">
@@ -1594,21 +1643,37 @@ export default function AddProductModal({
                                 </button>
 
                                 {isActive && (
-                                  <div className="w-full flex items-center justify-center gap-1 mt-0.5">
+                                  <div className="w-full flex flex-col items-center gap-1 mt-0.5">
                                     <span className="text-[10px] font-bold text-gray-500">الكمية:</span>
-                                    <input
-                                      type="number"
-                                      min="0"
-                                      value={qtyVal}
-                                      onChange={(e) =>
-                                        handleUpdateStockQuantity(
-                                          colorItem.id,
-                                          size,
-                                          parseInt(e.target.value) || 0
-                                        )
-                                      }
-                                      className="w-12 text-center py-1 bg-white rounded-lg border border-gray-300 text-xs font-mono font-bold focus:outline-none focus:border-[#8A2B43]"
-                                    />
+                                    <div className="w-full flex items-center justify-center gap-1">
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUpdateStockQuantity(colorItem.id, size, Math.max(0, qtyVal - 1))}
+                                        className="w-5 h-5 rounded-md bg-gray-100 hover:bg-[#8A2B43] hover:text-white text-gray-700 font-bold flex items-center justify-center text-xs transition-colors shrink-0"
+                                      >
+                                        -
+                                      </button>
+                                      <input
+                                        type="number"
+                                        min="0"
+                                        value={qtyVal}
+                                        onChange={(e) =>
+                                          handleUpdateStockQuantity(
+                                            colorItem.id,
+                                            size,
+                                            parseInt(e.target.value) || 0
+                                          )
+                                        }
+                                        className="w-10 text-center py-0.5 bg-white rounded-md border border-gray-300 text-xs font-mono font-bold focus:outline-none focus:border-[#8A2B43]"
+                                      />
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUpdateStockQuantity(colorItem.id, size, qtyVal + 1)}
+                                        className="w-5 h-5 rounded-md bg-gray-100 hover:bg-[#8A2B43] hover:text-white text-gray-700 font-bold flex items-center justify-center text-xs transition-colors shrink-0"
+                                      >
+                                        +
+                                      </button>
+                                    </div>
                                   </div>
                                 )}
                               </div>
