@@ -641,12 +641,19 @@ export default function InventoryGrid({
                                   return (
                                     <div
                                       key={v.id}
-                                      className={`px-3 py-1.5 rounded-2xl text-xs font-mono font-bold border flex items-center gap-2 transition-all shadow-xs ${
+                                      className={`px-2.5 py-1.5 rounded-2xl text-xs font-mono font-bold border flex items-center gap-2 transition-all shadow-xs ${
                                         stockQty > 0
-                                          ? 'bg-white text-gray-900 border-gray-300 shadow-xs'
+                                          ? 'bg-white text-gray-900 border-gray-300'
                                           : 'bg-rose-50/80 text-rose-700 border-rose-200 opacity-90'
                                       }`}
                                     >
+                                      {/* Size Label Badge */}
+                                      <span className="px-2 py-0.5 rounded-lg bg-gray-100 text-gray-900 font-extrabold text-xs border border-gray-200/80 shrink-0">
+                                        {v.size}
+                                      </span>
+
+                                      <span className="w-px h-3.5 bg-gray-200 shrink-0" />
+
                                       {/* Decrease Stock Button */}
                                       <button
                                         type="button"
@@ -660,8 +667,8 @@ export default function InventoryGrid({
                                       <span
                                         className={
                                           stockQty > 0
-                                            ? 'text-[#8A2B43] font-black text-xs min-w-[14px] text-center'
-                                            : 'text-rose-600 font-black text-xs min-w-[14px] text-center'
+                                            ? 'text-[#8A2B43] font-black text-xs min-w-[16px] text-center'
+                                            : 'text-rose-600 font-black text-xs min-w-[16px] text-center'
                                         }
                                       >
                                         {stockQty}
@@ -676,10 +683,6 @@ export default function InventoryGrid({
                                       >
                                         +
                                       </button>
-
-                                      <span className="font-black text-gray-900 text-xs dir-ltr" dir="ltr">
-                                        :{v.size}
-                                      </span>
                                     </div>
                                   );
                                 })}
