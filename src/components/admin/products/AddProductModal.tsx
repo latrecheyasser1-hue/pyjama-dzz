@@ -18,6 +18,7 @@ import {
   Image as ImageIcon,
   CheckCircle,
   Sparkles,
+  Zap,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { Category, Product, ProductColor, ProductVariant, Supplier } from '@/types/admin';
@@ -28,7 +29,22 @@ interface AddProductModalProps {
   onProductAdded: (newProduct: Product) => void;
 }
 
-const ALL_SIZES_ORDERED = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'];
+export type SizeCategoryKey = 'CLOTHING' | 'SHOES' | 'LINGERIE';
+
+export const SIZE_CATEGORIES: Record<SizeCategoryKey, { label: string; sizes: string[] }> = {
+  CLOTHING: {
+    label: 'ملابس وبيجامات (Clothing)',
+    sizes: ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'],
+  },
+  SHOES: {
+    label: 'أحذية وبانتوف (Shoes / Pointure)',
+    sizes: ['35', '36', '37', '38', '39', '40', '41', '42', '43'],
+  },
+  LINGERIE: {
+    label: 'لانجري وصدريات (Lingerie Cups)',
+    sizes: ['80B', '85B', '90B', '95B', '100B', '105B'],
+  },
+};
 
 interface ColorInputItem {
   id: string;
@@ -53,9 +69,11 @@ export default function AddProductModal({
   const [costPrice, setCostPrice] = useState<number | ''>('');
   const [sellingPrice, setSellingPrice] = useState<number | ''>('');
   const [oldPrice, setOldPrice] = useState<number | ''>('');
-  const [wholesalePrice, setWholesalePrice] = useState<number | ''>(''); // 5+ Units Retail Discount Price
+  const [wholesalePrice, setWholesalePrice] = useState<number | ''>('');
 
-  // Auto-Range Sizes State
+  // Flexible Size System State
+  const [sizeCategory, setSizeCategory] = useState<SizeCategoryKey>('CLOTHING');
+  const [isStandardSize, setIsStandardSize] = useState(false);
   const [minSize, setMinSize] = useState('S');
   const [maxSize, setMaxSize] = useState('XL');
 
@@ -128,7 +146,7 @@ export default function AddProductModal({
     fetchData();
   }, [isOpen]);
 
-  // Handle Dynamic Supplier Selection (Auto-Fill Phone)
+  // Handle Supplier Selection
   const handleSupplierChange = (supId: string) => {
     setSelectedSupplierId(supId);
     if (supId === 'CUSTOM' || supId === '') {
@@ -150,15 +168,34 @@ export default function AddProductModal({
     setSku(`PYJ-${randomNum}`);
   };
 
-  // Helper to calculate auto-range sizes array
+  // Handle Size Category Change
+  const handleSizeCategoryChange = (catKey: SizeCategoryKey) => {
+    setSizeCategory(catKey);
+    setIsStandardSize(false);
+    const availableSizes = SIZE_CATEGORIES[catKey].sizes;
+    setMinSize(availableSizes[0]);
+    setMaxSize(availableSizes[Math.min(3, availableSizes.length - 1)]);
+  };
+
+  // Toggle Standard Size
+  const handleToggleStandardSize = () => {
+    setIsStandardSize((prev) => !prev);
+  };
+
+  // Helper to calculate sizes array
   const getGeneratedSizes = (): string[] => {
-    const minIndex = ALL_SIZES_ORDERED.indexOf(minSize);
-    const maxIndex = ALL_SIZES_ORDERED.indexOf(maxSize);
+    if (isStandardSize) {
+      return ['Standard / Free Size'];
+    }
+
+    const currentSizes = SIZE_CATEGORIES[sizeCategory].sizes;
+    const minIndex = currentSizes.indexOf(minSize);
+    const maxIndex = currentSizes.indexOf(maxSize);
 
     if (minIndex === -1 || maxIndex === -1 || minIndex > maxIndex) {
       return [minSize];
     }
-    return ALL_SIZES_ORDERED.slice(minIndex, maxIndex + 1);
+    return currentSizes.slice(minIndex, maxIndex + 1);
   };
 
   // Color Handlers
@@ -180,7 +217,7 @@ export default function AddProductModal({
     setColors((prev) => prev.filter((c) => c.id !== id));
   };
 
-  // Calculate discount percentage if old price > selling price
+  // Calculate discount percentage
   const calculateDiscountPercentage = (): number | null => {
     if (oldPrice && sellingPrice && Number(oldPrice) > Number(sellingPrice)) {
       const discount = ((Number(oldPrice) - Number(sellingPrice)) / Number(oldPrice)) * 100;
@@ -200,6 +237,8 @@ export default function AddProductModal({
     setSellingPrice('');
     setOldPrice('');
     setWholesalePrice('');
+    setSizeCategory('CLOTHING');
+    setIsStandardSize(false);
     setMinSize('S');
     setMaxSize('XL');
     setColors([{ id: 'c-1', colorName: 'Burgundy (عنابي)', imageUrl: '' }]);
@@ -241,7 +280,7 @@ export default function AddProductModal({
         cost_price: Number(costPrice) || 0,
         selling_price: Number(sellingPrice) || 0,
         old_price: oldPrice !== '' ? Number(oldPrice) : null,
-        wholesale_price: wholesalePrice !== '' ? Number(wholesalePrice) : null, // 5+ units price
+        wholesale_price: wholesalePrice !== '' ? Number(wholesalePrice) : null,
         description: description.trim() || null,
         image_url: activeColors[0]?.imageUrl || null,
       };
@@ -290,7 +329,7 @@ export default function AddProductModal({
         await supabase.from('product_variants').insert(variantRows);
       }
 
-      // 6. Build Local Product Object for immediate UI update
+      // 6. Build Local Product Object for instant UI sync
       const generatedVariants: ProductVariant[] = [];
       activeColors.forEach((c) => {
         generatedSizes.forEach((s) => {
@@ -342,6 +381,7 @@ export default function AddProductModal({
 
   const generatedSizesList = getGeneratedSizes();
   const discountPercent = calculateDiscountPercentage();
+  const currentCategorySizes = SIZE_CATEGORIES[sizeCategory].sizes;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm dir-rtl" dir="rtl">
@@ -355,7 +395,7 @@ export default function AddProductModal({
             <div>
               <h2 className="text-lg sm:text-xl font-bold">إضافة منتج جديد (Add New Product)</h2>
               <p className="text-xs text-white/80 mt-0.5">
-                إدارة الموردين الديناميكية، أسعار التجزئة، وخصومات الكمية (5+ حبات)
+                تحديد أنواع المقاسات والمرونة (الملابس، الأحذية، الصدريات، والمقاس الموحد)
               </p>
             </div>
           </div>
@@ -443,7 +483,7 @@ export default function AddProductModal({
                 </div>
               </div>
 
-              {/* Supplier Dropdown (Dynamic Integration) */}
+              {/* Supplier Dropdown */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">
                   اختيار المورّد / الورشة (Supplier Name)
@@ -478,7 +518,7 @@ export default function AddProductModal({
               {/* Auto-Filled Supplier Phone */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">
-                  رقم هاتف المورّد (Auto-filled Supplier Phone)
+                  رقم هاتف المورّد (Supplier Phone)
                 </label>
                 <div className="relative">
                   <Phone className="w-4 h-4 text-gray-400 absolute right-3 top-3.5" />
@@ -486,7 +526,7 @@ export default function AddProductModal({
                     type="text"
                     value={supplierPhone}
                     onChange={(e) => setSupplierPhone(e.target.value)}
-                    placeholder="يتم ملؤه تلقائياً فور اختيار المورد..."
+                    placeholder="يتم ملؤه تلقائياً..."
                     className="w-full pr-10 pl-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold focus:outline-none focus:border-[#8A2B43] shadow-sm"
                   />
                 </div>
@@ -494,7 +534,7 @@ export default function AddProductModal({
             </div>
           </div>
 
-          {/* SECTION B: Detailed Pricing & Volume Promotions (DZD) */}
+          {/* SECTION B: Pricing & Volume Promotions (DZD) */}
           <div className="space-y-4 bg-pyjama-cream/40 p-5 rounded-3xl border border-gray-100">
             <div className="flex items-center justify-between border-b border-gray-200/80 pb-3">
               <h3 className="text-sm font-bold text-[#7A1C32] flex items-center gap-2">
@@ -505,7 +545,7 @@ export default function AddProductModal({
               {discountPercent !== null && (
                 <span className="px-3 py-1 bg-rose-100 text-rose-700 border border-rose-200 rounded-full text-xs font-bold flex items-center gap-1 animate-pulse">
                   <Sparkles className="w-3.5 h-3.5" />
-                  <span>عروض وتخفيضات ممتاز: خصم {discountPercent}% 🔥</span>
+                  <span>خصم {discountPercent}% 🔥</span>
                 </span>
               )}
             </div>
@@ -570,58 +610,101 @@ export default function AddProductModal({
             </div>
           </div>
 
-          {/* SECTION C: Smart Auto-Range Sizes Logic */}
-          <div className="space-y-4 bg-pyjama-cream/40 p-5 rounded-3xl border border-gray-100">
-            <h3 className="text-sm font-bold text-[#7A1C32] flex items-center gap-2 border-b border-gray-200/80 pb-3">
-              <Ruler className="w-4 h-4 text-[#8A2B43]" />
-              <span>ثالثاً: المقاسات والتوليد التلقائي (Smart Auto-Range Sizes)</span>
-            </h3>
+          {/* SECTION C: Flexible Size Selection System */}
+          <div className="space-y-5 bg-pyjama-cream/40 p-5 rounded-3xl border border-gray-100">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-gray-200/80 pb-3">
+              <h3 className="text-sm font-bold text-[#7A1C32] flex items-center gap-2">
+                <Ruler className="w-4 h-4 text-[#8A2B43]" />
+                <span>ثالثاً: نظام اختيار المقاسات والمرونة (Flexible Size System)</span>
+              </h3>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Smallest Size */}
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  أصغر مقاس في السلسلة (Smallest Size)
-                </label>
-                <select
-                  value={minSize}
-                  onChange={(e) => setMinSize(e.target.value)}
-                  className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold focus:outline-none focus:border-[#8A2B43] shadow-sm"
-                >
-                  {ALL_SIZES_ORDERED.map((s) => (
-                    <option key={`min-${s}`} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* Largest Size */}
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  أكبر مقاس في السلسلة (Largest Size)
-                </label>
-                <select
-                  value={maxSize}
-                  onChange={(e) => setMaxSize(e.target.value)}
-                  className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold focus:outline-none focus:border-[#8A2B43] shadow-sm"
-                >
-                  {ALL_SIZES_ORDERED.map((s) => (
-                    <option key={`max-${s}`} value={s}>
-                      {s}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              {/* Quick Standard Size Button */}
+              <button
+                type="button"
+                onClick={handleToggleStandardSize}
+                className={`flex items-center gap-1.5 px-4 py-2 rounded-xl text-xs font-bold transition-all shadow-sm ${
+                  isStandardSize
+                    ? 'bg-[#8A2B43] text-white ring-2 ring-[#8A2B43]/30'
+                    : 'bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200'
+                }`}
+              >
+                <Zap className="w-3.5 h-3.5" />
+                <span>{isStandardSize ? '✓ مقاس موحد مفّعل (Standard)' : '⚡ مقاس موحد (Free Size / Standard)'}</span>
+              </button>
             </div>
 
+            {/* Size Category Selector & Range Inputs */}
+            {!isStandardSize && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  {/* Size Category Dropdown */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      نوع المقاس (Size Category)
+                    </label>
+                    <select
+                      value={sizeCategory}
+                      onChange={(e) => handleSizeCategoryChange(e.target.value as SizeCategoryKey)}
+                      className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-bold text-[#8A2B43] focus:outline-none focus:border-[#8A2B43] shadow-sm"
+                    >
+                      {Object.entries(SIZE_CATEGORIES).map(([key, item]) => (
+                        <option key={key} value={key}>
+                          {item.label}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Smallest Size */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      أصغر مقاس (Smallest Size)
+                    </label>
+                    <select
+                      value={minSize}
+                      onChange={(e) => setMinSize(e.target.value)}
+                      className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold focus:outline-none focus:border-[#8A2B43] shadow-sm"
+                    >
+                      {currentCategorySizes.map((s) => (
+                        <option key={`min-${s}`} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Largest Size */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      أكبر مقاس (Largest Size)
+                    </label>
+                    <select
+                      value={maxSize}
+                      onChange={(e) => setMaxSize(e.target.value)}
+                      className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold focus:outline-none focus:border-[#8A2B43] shadow-sm"
+                    >
+                      {currentCategorySizes.map((s) => (
+                        <option key={`max-${s}`} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Generated Sizes Preview Badges */}
-            <div className="p-4 bg-white rounded-2xl border border-gray-200 flex flex-wrap items-center gap-2">
+            <div className="p-4 bg-white rounded-2xl border border-gray-200 flex flex-wrap items-center gap-2 shadow-sm">
               <span className="text-xs font-bold text-gray-600 ml-2">المقاسات المحدّدة تلقائياً:</span>
               {generatedSizesList.map((size) => (
                 <span
                   key={size}
-                  className="px-3 py-1 bg-pyjama-pink-soft text-[#8A2B43] border border-pyjama-pink/40 rounded-xl text-xs font-mono font-black shadow-sm"
+                  className={`px-3 py-1 rounded-xl text-xs font-mono font-black shadow-sm ${
+                    isStandardSize
+                      ? 'bg-amber-100 text-amber-900 border border-amber-300'
+                      : 'bg-pyjama-pink-soft text-[#8A2B43] border border-pyjama-pink/40'
+                  }`}
                 >
                   {size}
                 </span>
