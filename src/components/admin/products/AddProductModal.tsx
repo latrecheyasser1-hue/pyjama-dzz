@@ -359,11 +359,20 @@ export default function AddProductModal({
             }
           });
 
+          // Check if any variant in this color has its own specific color_image_url
+          const specificVariantImg = colorVariants.find(
+            (v: any) => v.color_image_url || v.colorImageUrl
+          );
+          const specificColorImg =
+            specificVariantImg?.color_image_url ||
+            specificVariantImg?.colorImageUrl ||
+            c.imageUrl;
+
           return {
             id: `c-edit-${idx}-${Date.now()}`,
             colorName: colorName,
             colorHex: '#ffffff',
-            imageUrl: c.imageUrl || productToEdit.imageUrl || '',
+            imageUrl: specificColorImg || '', // Strictly specific color image only!
             deliveryStocks: delStocks,
             storeStocks: storeStocks,
             wholesaleStocks: wsStocks,
@@ -399,11 +408,18 @@ export default function AddProductModal({
             }
           });
 
+          const specificVariantImg = vars.find(
+            (v: any) => v.color_image_url || v.colorImageUrl
+          );
+          const specificImg =
+            specificVariantImg?.color_image_url ||
+            specificVariantImg?.colorImageUrl;
+
           return {
             id: `c-edit-v-${idx}-${Date.now()}`,
             colorName: colName,
             colorHex: '#ffffff',
-            imageUrl: productToEdit.imageUrl || '',
+            imageUrl: specificImg || '', // Strictly specific color image only!
             deliveryStocks: delStocks,
             storeStocks: storeStocks,
             wholesaleStocks: wsStocks,
