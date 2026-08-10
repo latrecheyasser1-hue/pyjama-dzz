@@ -101,15 +101,15 @@ export default function AdminSidebar({
         <div>
           <div className="p-6 border-b border-white/10 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-11 h-11 rounded-2xl bg-[#E8A5B8] flex items-center justify-center shadow-lg text-[#7A1C32] font-black text-xl">
-                بي
+              <div className="w-11 h-11 rounded-2xl bg-[#E8A5B8] flex items-center justify-center shadow-lg text-[#7A1C32] font-black text-sm tracking-wider font-mono">
+                DZ
               </div>
               <div>
                 <h1 className="text-xl font-black text-white tracking-wide font-sans">
-                  بيجاما ديزاين
+                  بيجاما دي زيد
                 </h1>
-                <p className="text-[11px] text-[#E8A5B8] font-medium tracking-wider">
-                  Pyjama Design ERP
+                <p className="text-[11px] text-[#E8A5B8] font-medium tracking-wider font-mono">
+                  Pyjama DZ
                 </p>
               </div>
             </div>
@@ -123,7 +123,7 @@ export default function AdminSidebar({
           </div>
 
           {/* Navigation Links */}
-          <nav className="p-4 space-y-1.5 overflow-y-auto max-h-[calc(100vh-140px)]">
+          <nav className="p-4 space-y-1.5 overflow-y-auto max-h-[calc(100vh-100px)]">
             {menuItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeSection === item.id;
@@ -167,13 +167,6 @@ export default function AdminSidebar({
               );
             })}
           </nav>
-        </div>
-
-        {/* Clean Footer Branding */}
-        <div className="p-4 border-t border-white/10 bg-[#581223]/50 text-center">
-          <p className="text-[11px] text-[#E8A5B8] font-medium font-sans">
-            بيجاما ديزاين • لوحة التحكم الرئيسيّة
-          </p>
         </div>
       </aside>
     </>
