@@ -17,9 +17,10 @@ import {
   Phone,
   Image as ImageIcon,
   CheckCircle,
+  Sparkles,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
-import { Category, Product, ProductColor, ProductVariant } from '@/types/admin';
+import { Category, Product, ProductColor, ProductVariant, Supplier } from '@/types/admin';
 
 interface AddProductModalProps {
   isOpen: boolean;
@@ -40,18 +41,19 @@ export default function AddProductModal({
   onClose,
   onProductAdded,
 }: AddProductModalProps) {
-  // Form State
+  // Basic Info Form State
   const [nameAr, setNameAr] = useState('');
   const [categoryId, setCategoryId] = useState('');
+  const [selectedSupplierId, setSelectedSupplierId] = useState('');
   const [supplierName, setSupplierName] = useState('');
   const [supplierPhone, setSupplierPhone] = useState('');
   const [sku, setSku] = useState('');
 
-  // Pricing State (DZD)
+  // Detailed Pricing State (DZD)
   const [costPrice, setCostPrice] = useState<number | ''>('');
   const [sellingPrice, setSellingPrice] = useState<number | ''>('');
   const [oldPrice, setOldPrice] = useState<number | ''>('');
-  const [wholesalePrice, setWholesalePrice] = useState<number | ''>('');
+  const [wholesalePrice, setWholesalePrice] = useState<number | ''>(''); // 5+ Units Retail Discount Price
 
   // Auto-Range Sizes State
   const [minSize, setMinSize] = useState('S');
@@ -65,43 +67,82 @@ export default function AddProductModal({
   // Description & Additional Notes
   const [description, setDescription] = useState('');
 
-  // Categories list from live Supabase DB
+  // Dynamic DB Lists
   const [categories, setCategories] = useState<Category[]>([]);
+  const [suppliers, setSuppliers] = useState<Supplier[]>([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState(false);
+  const [isLoadingSuppliers, setIsLoadingLoadingSuppliers] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Fetch Categories from Supabase
+  // Fetch Categories & Registered Suppliers from Supabase DB
   useEffect(() => {
     if (!isOpen) return;
 
-    const fetchCategories = async () => {
+    const fetchData = async () => {
       setIsLoadingCategories(true);
+      setIsLoadingLoadingSuppliers(true);
+
       try {
-        const { data, error } = await supabase
+        // 1. Fetch Categories
+        const { data: catData } = await supabase
           .from('categories')
           .select('*')
           .order('name', { ascending: true });
 
-        if (!error && data && data.length > 0) {
-          const mapped: Category[] = data.map((item: any) => ({
+        if (catData && catData.length > 0) {
+          const mappedCats: Category[] = catData.map((item: any) => ({
             id: String(item.id),
             name: item.name || item.name_ar || '',
             slug: item.slug,
           }));
-          setCategories(mapped);
-          if (!categoryId && mapped.length > 0) {
-            setCategoryId(mapped[0].id);
+          setCategories(mappedCats);
+          if (!categoryId && mappedCats.length > 0) {
+            setCategoryId(mappedCats[0].id);
           }
         }
+
+        // 2. Fetch Suppliers
+        const { data: supData } = await supabase
+          .from('suppliers')
+          .select('*')
+          .order('name', { ascending: true });
+
+        if (supData && supData.length > 0) {
+          const mappedSups: Supplier[] = supData.map((item: any) => ({
+            id: String(item.id),
+            name: item.name || item.supplier_name || '',
+            phone: item.phone || item.supplier_phone || '',
+            totalOrders: item.total_orders || 0,
+            outstandingBalance: item.outstanding_balance || 0,
+          }));
+          setSuppliers(mappedSups);
+        }
       } catch (err) {
-        console.warn('Failed to fetch categories for product modal:', err);
+        console.warn('Notice fetching initial data for modal:', err);
       } finally {
         setIsLoadingCategories(false);
+        setIsLoadingLoadingSuppliers(false);
       }
     };
 
-    fetchCategories();
+    fetchData();
   }, [isOpen]);
+
+  // Handle Dynamic Supplier Selection (Auto-Fill Phone)
+  const handleSupplierChange = (supId: string) => {
+    setSelectedSupplierId(supId);
+    if (supId === 'CUSTOM' || supId === '') {
+      setSupplierName('');
+      setSupplierPhone('');
+      return;
+    }
+
+    const foundSup = suppliers.find((s) => s.id === supId);
+    if (foundSup) {
+      setSupplierName(foundSup.name);
+      setSupplierPhone(foundSup.phone);
+    }
+  };
 
   // Helper to generate random SKU
   const handleAutoGenerateSku = () => {
@@ -135,13 +176,23 @@ export default function AddProductModal({
   };
 
   const handleRemoveColor = (id: string) => {
-    if (colors.length <= 1) return; // Keep at least one color
+    if (colors.length <= 1) return;
     setColors((prev) => prev.filter((c) => c.id !== id));
+  };
+
+  // Calculate discount percentage if old price > selling price
+  const calculateDiscountPercentage = (): number | null => {
+    if (oldPrice && sellingPrice && Number(oldPrice) > Number(sellingPrice)) {
+      const discount = ((Number(oldPrice) - Number(sellingPrice)) / Number(oldPrice)) * 100;
+      return Math.round(discount);
+    }
+    return null;
   };
 
   // Form Reset
   const resetForm = () => {
     setNameAr('');
+    setSelectedSupplierId('');
     setSupplierName('');
     setSupplierPhone('');
     setSku('');
@@ -180,7 +231,7 @@ export default function AddProductModal({
     setIsSubmitting(true);
 
     try {
-      // 1. Prepare Product Base Object
+      // 1. Prepare Product Base Payload
       const productPayload = {
         name: nameAr.trim(),
         sku: finalSku,
@@ -190,7 +241,7 @@ export default function AddProductModal({
         cost_price: Number(costPrice) || 0,
         selling_price: Number(sellingPrice) || 0,
         old_price: oldPrice !== '' ? Number(oldPrice) : null,
-        wholesale_price: wholesalePrice !== '' ? Number(wholesalePrice) : null,
+        wholesale_price: wholesalePrice !== '' ? Number(wholesalePrice) : null, // 5+ units price
         description: description.trim() || null,
         image_url: activeColors[0]?.imageUrl || null,
       };
@@ -222,7 +273,7 @@ export default function AddProductModal({
         }));
         await supabase.from('product_sizes').insert(sizeRows);
 
-        // 5. Insert Child `product_variants` (Colors x Sizes combination)
+        // 5. Insert Child `product_variants`
         const variantRows: any[] = [];
         activeColors.forEach((c) => {
           generatedSizes.forEach((s) => {
@@ -239,7 +290,7 @@ export default function AddProductModal({
         await supabase.from('product_variants').insert(variantRows);
       }
 
-      // 6. Build Local Product Object for instant UI sync
+      // 6. Build Local Product Object for immediate UI update
       const generatedVariants: ProductVariant[] = [];
       activeColors.forEach((c) => {
         generatedSizes.forEach((s) => {
@@ -290,6 +341,7 @@ export default function AddProductModal({
   if (!isOpen) return null;
 
   const generatedSizesList = getGeneratedSizes();
+  const discountPercent = calculateDiscountPercentage();
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm dir-rtl" dir="rtl">
@@ -303,7 +355,7 @@ export default function AddProductModal({
             <div>
               <h2 className="text-lg sm:text-xl font-bold">إضافة منتج جديد (Add New Product)</h2>
               <p className="text-xs text-white/80 mt-0.5">
-                تعيين ألوان المنتجات، حساب المقاسات التلقائي، والأسعار
+                إدارة الموردين الديناميكية، أسعار التجزئة، وخصومات الكمية (5+ حبات)
               </p>
             </div>
           </div>
@@ -319,11 +371,11 @@ export default function AddProductModal({
 
         {/* Modal Scrollable Body Form */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-8 flex-1">
-          {/* SECTION A: Basic Info & Supplier Details */}
+          {/* SECTION A: Basic Info & Dynamic Supplier Integration */}
           <div className="space-y-4 bg-pyjama-cream/40 p-5 rounded-3xl border border-gray-100">
             <h3 className="text-sm font-bold text-[#7A1C32] flex items-center gap-2 border-b border-gray-200/80 pb-3">
               <Grid className="w-4 h-4 text-[#8A2B43]" />
-              <span>أولاً: المعلومات الأساسية والمورّد (Basic Info & Supplier)</span>
+              <span>أولاً: البيانات الأساسية والمورّد (Basic Info & Supplier)</span>
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -391,27 +443,42 @@ export default function AddProductModal({
                 </div>
               </div>
 
-              {/* Supplier Name */}
+              {/* Supplier Dropdown (Dynamic Integration) */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">
-                  اسم المورّد / الورشة (Supplier Name)
+                  اختيار المورّد / الورشة (Supplier Name)
                 </label>
                 <div className="relative">
                   <Truck className="w-4 h-4 text-gray-400 absolute right-3 top-3.5" />
+                  <select
+                    value={selectedSupplierId}
+                    onChange={(e) => handleSupplierChange(e.target.value)}
+                    className="w-full pr-10 pl-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-bold focus:outline-none focus:border-[#8A2B43] shadow-sm"
+                  >
+                    <option value="">-- اختر المورّد من القائمة المسجلة --</option>
+                    {suppliers.map((sup) => (
+                      <option key={sup.id} value={sup.id}>
+                        {sup.name} ({sup.phone || 'بدون هاتف'})
+                      </option>
+                    ))}
+                    <option value="CUSTOM">+ أدخل مورد جديد يدوياً</option>
+                  </select>
+                </div>
+                {selectedSupplierId === 'CUSTOM' && (
                   <input
                     type="text"
                     value={supplierName}
                     onChange={(e) => setSupplierName(e.target.value)}
-                    placeholder="مثال: ورشة البهجة للمنسوجات"
-                    className="w-full pr-10 pl-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-bold focus:outline-none focus:border-[#8A2B43] shadow-sm"
+                    placeholder="اكتب اسم المورد الجديد يدوياً..."
+                    className="w-full mt-2 px-4 py-2.5 bg-white rounded-xl border border-gray-200 text-xs font-bold focus:outline-none focus:border-[#8A2B43]"
                   />
-                </div>
+                )}
               </div>
 
-              {/* Supplier Phone */}
+              {/* Auto-Filled Supplier Phone */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">
-                  رقم هاتف المورّد (Supplier Phone)
+                  رقم هاتف المورّد (Auto-filled Supplier Phone)
                 </label>
                 <div className="relative">
                   <Phone className="w-4 h-4 text-gray-400 absolute right-3 top-3.5" />
@@ -419,7 +486,7 @@ export default function AddProductModal({
                     type="text"
                     value={supplierPhone}
                     onChange={(e) => setSupplierPhone(e.target.value)}
-                    placeholder="مثال: +213 550 12 34 56"
+                    placeholder="يتم ملؤه تلقائياً فور اختيار المورد..."
                     className="w-full pr-10 pl-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold focus:outline-none focus:border-[#8A2B43] shadow-sm"
                   />
                 </div>
@@ -427,15 +494,24 @@ export default function AddProductModal({
             </div>
           </div>
 
-          {/* SECTION B: Pricing & Bulk Promotions (DZD) */}
+          {/* SECTION B: Detailed Pricing & Volume Promotions (DZD) */}
           <div className="space-y-4 bg-pyjama-cream/40 p-5 rounded-3xl border border-gray-100">
-            <h3 className="text-sm font-bold text-[#7A1C32] flex items-center gap-2 border-b border-gray-200/80 pb-3">
-              <DollarSign className="w-4 h-4 text-[#8A2B43]" />
-              <span>ثانياً: الأسعار والتخفيضات والجملة (DZD Pricing & Discounts)</span>
-            </h3>
+            <div className="flex items-center justify-between border-b border-gray-200/80 pb-3">
+              <h3 className="text-sm font-bold text-[#7A1C32] flex items-center gap-2">
+                <DollarSign className="w-4 h-4 text-[#8A2B43]" />
+                <span>ثانياً: الأسعار والتخفيضات والخصم عند شراء 5 حبات (DZD Pricing)</span>
+              </h3>
+
+              {discountPercent !== null && (
+                <span className="px-3 py-1 bg-rose-100 text-rose-700 border border-rose-200 rounded-full text-xs font-bold flex items-center gap-1 animate-pulse">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>عروض وتخفيضات ممتاز: خصم {discountPercent}% 🔥</span>
+                </span>
+              )}
+            </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* Purchase Cost Price */}
+              {/* 1. Purchase Cost Price */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">
                   سعر الشراء / التكلفة (DZD)
@@ -447,12 +523,13 @@ export default function AddProductModal({
                   placeholder="مثال: 3200"
                   className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold focus:outline-none focus:border-[#8A2B43] shadow-sm"
                 />
+                <p className="text-[10px] text-gray-400 mt-1">حساب صافي الأرباح</p>
               </div>
 
-              {/* Current Selling Price */}
+              {/* 2. Current Selling Price */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">
-                  سعر البيع الحالي (DZD) <span className="text-rose-500">*</span>
+                  سعر البيع للتجزئة (DZD) <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="number"
@@ -462,9 +539,10 @@ export default function AddProductModal({
                   className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold text-[#8A2B43] focus:outline-none focus:border-[#8A2B43] shadow-sm"
                   required
                 />
+                <p className="text-[10px] text-[#8A2B43] font-bold mt-1">سعر القطعة الفردية في المتجر</p>
               </div>
 
-              {/* Old Price Before Discount */}
+              {/* 3. Old Price Before Discount */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">
                   السعر القديم قبل الخصم (DZD)
@@ -476,12 +554,13 @@ export default function AddProductModal({
                   placeholder="مثال: 6800 (اختياري)"
                   className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold text-gray-400 focus:outline-none focus:border-[#8A2B43] shadow-sm"
                 />
+                <p className="text-[10px] text-gray-500 mt-1">يظهر مشطوباً لإبراز التخفيض 🔥</p>
               </div>
 
-              {/* Wholesale Discount Price (5+ items) */}
+              {/* 4. 5+ Units Retail Incentive Price */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">
-                  سعر الجملة / 5 حبات فأكثر (DZD)
+                  سعر الخصم عند شراء 5 حبات فما فوق (DZD)
                 </label>
                 <input
                   type="number"
@@ -490,6 +569,7 @@ export default function AddProductModal({
                   placeholder="مثال: 4200 (اختياري)"
                   className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-[#8A2B43] shadow-sm"
                 />
+                <p className="text-[10px] text-purple-800 font-medium mt-1">سعر تشجيع شراء الكمية في التجزئة</p>
               </div>
             </div>
           </div>
