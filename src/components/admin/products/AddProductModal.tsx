@@ -87,7 +87,7 @@ export default function AddProductModal({
   reFetchProducts,
   productToEdit,
 }: AddProductModalProps) {
-  // Basic Info Form State
+  // Basic Info Form State - Initialized strictly to empty string for Category
   const [nameAr, setNameAr] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [selectedSupplierId, setSelectedSupplierId] = useState('');
@@ -140,9 +140,10 @@ export default function AddProductModal({
 
   const isEditMode = !!productToEdit;
 
-  // Form Reset
+  // Clean Form Reset
   const resetForm = () => {
     setNameAr('');
+    setCategoryId('');
     setSelectedSupplierId('');
     setSupplierName('');
     setSupplierPhone('');
@@ -224,7 +225,7 @@ export default function AddProductModal({
     fetchData();
   }, [isOpen]);
 
-  // Pre-fill Edit Mode Data with Strict Category & Field Preservation
+  // Pre-fill Edit Mode Data vs Clean Reset for New Product
   useEffect(() => {
     if (!isOpen) return;
 
@@ -1032,7 +1033,7 @@ export default function AddProductModal({
                 />
               </div>
 
-              {/* Category Dropdown */}
+              {/* Category Dropdown - Strictly Unselected Placeholder by Default */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">
                   القسم (Category)
@@ -1042,9 +1043,9 @@ export default function AddProductModal({
                   onChange={(e) => setCategoryId(e.target.value)}
                   className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-bold focus:outline-none focus:border-[#8A2B43] shadow-sm"
                 >
-                  <option value="">-- اختر القسم من القائمة --</option>
+                  <option value="" disabled>-- اختر القسم --</option>
                   {isLoadingCategories ? (
-                    <option value="">جاري تحميل الأقسام...</option>
+                    <option value="" disabled>جاري تحميل الأقسام...</option>
                   ) : (
                     categories.map((cat) => (
                       <option key={cat.id} value={cat.id}>
