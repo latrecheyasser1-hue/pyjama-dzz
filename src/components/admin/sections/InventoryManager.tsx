@@ -59,24 +59,18 @@ export default function InventoryManager({
     setIsAddModalOpen(true);
   };
 
-  const handleProductCreated = (newProd: Product) => {
-    if (onAddProduct) {
-      onAddProduct(newProd);
-    }
+  const handleProductCreated = (newProduct: Product) => {
+    if (onAddProduct) onAddProduct(newProduct);
   };
 
-  const handleProductUpdated = (updatedProd: Product) => {
-    if (onUpdateProduct) {
-      onUpdateProduct(updatedProd);
-    } else if (onAddProduct) {
-      onAddProduct(updatedProd);
-    }
+  const handleProductUpdated = (updatedProduct: Product) => {
+    if (onUpdateProduct) onUpdateProduct(updatedProduct);
   };
 
   return (
     <div className="space-y-6 dir-rtl" dir="rtl">
-      {/* Single Unified Header Card */}
-      <div className="bg-white rounded-3xl p-5 border border-gray-100 shadow-card flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      {/* Dynamic Header & Embedded Actions */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-3xl border border-gray-100 shadow-card">
         <div className="space-y-0.5">
           <h2 className="text-lg sm:text-xl font-bold text-pyjama-charcoal">
             {getDynamicTitle(activeStockTab)}
@@ -121,6 +115,7 @@ export default function InventoryManager({
         onUpdateStock={onUpdateStock}
         onDeleteProduct={onDeleteProduct}
         onEditProduct={handleEditProduct}
+        reFetchProducts={reFetchProducts}
       />
 
       {/* Add / Edit Product Modal with Strict Warehouse Context Isolation */}

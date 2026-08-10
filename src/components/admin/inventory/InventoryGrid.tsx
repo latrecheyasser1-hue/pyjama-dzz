@@ -13,6 +13,7 @@ import {
   Clock,
   Sparkles,
 } from 'lucide-react';
+import { supabase } from '@/lib/supabaseClient';
 import { Product, StockType, Category } from '@/types/admin';
 
 interface InventoryGridProps {
@@ -22,6 +23,7 @@ interface InventoryGridProps {
   onUpdateStock: (variantId: string, stockType: StockType, newQuantity: number) => void;
   onDeleteProduct?: (productId: string, stockType: StockType) => void;
   onEditProduct?: (product: Product) => void;
+  reFetchProducts?: () => Promise<void>;
 }
 
 export default function InventoryGrid({
@@ -31,6 +33,7 @@ export default function InventoryGrid({
   onUpdateStock,
   onDeleteProduct,
   onEditProduct,
+  reFetchProducts,
 }: InventoryGridProps) {
   // Level 1 vs Level 2 state
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
@@ -63,7 +66,7 @@ export default function InventoryGrid({
   products.forEach((p) => {
     if (hasStockInActiveWarehouse(p)) {
       const catId = p.categoryId || 'uncategorized';
-      const catName = p.categoryNameAr || 'أقسام عامة';
+      const catName = p.categoryNameAr || 'أقسان عامة';
       if (!categoryStatsMap[catId]) {
         categoryStatsMap[catId] = {
           id: catId,
@@ -91,19 +94,21 @@ export default function InventoryGrid({
   const activeCategoryName =
     categoryCardsList.find((c) => c.id === selectedCategoryId)?.name || 'القسم المحدد';
 
-  const handleDelete = (e: React.MouseEvent, productId: string, name: string) => {
-    e.stopPropagation();
-    const warehouseName =
-      activeStockTab === 'DELIVERY'
-        ? 'مخزون التوصيل'
-        : activeStockTab === 'STORE'
-        ? 'مخزون المحل'
-        : 'مخزون الجملة';
-
-    if (!confirm(`هل أنت تأكد من إزالة المنتج "${name}" من (${warehouseName})؟`)) return;
-
-    if (onDeleteProduct) {
-      onDeleteProduct(productId, activeStockTab);
+  // Explicit Direct Delete Action Handler
+  const handleDeleteProduct = async (productId: string, e: React.MouseEvent) => {
+    e.stopPropagation(); // Prevent opening Edit Modal on card click
+    if (confirm('هل أنت تأكد من رغبتك في حذف هذا المنتج نهائياً؟')) {
+      if (onDeleteProduct) {
+        await onDeleteProduct(productId, activeStockTab);
+      } else {
+        const { error } = await supabase.from('products').delete().eq('id', productId);
+        if (error) {
+          alert('خطأ أثناء الحذف: ' + error.message);
+        }
+      }
+      if (reFetchProducts) {
+        await reFetchProducts();
+      }
     }
   };
 
@@ -120,52 +125,56 @@ export default function InventoryGrid({
 
   return (
     <div className="space-y-6 dir-rtl" dir="rtl">
-      {/* LEVEL 1: Category Cards Grid View */}
+      {/* LEVEL 1: Dynamic Category Cards View */}
       {selectedCategoryId === null ? (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-base sm:text-lg font-bold text-pyjama-charcoal flex items-center gap-2">
-              <Layers className="w-5 h-5 text-[#8A2B43]" />
-              <span>أقسام المخزون المتاحة ({activeStockTab === 'DELIVERY' ? 'مخزون التوصيل' : activeStockTab === 'STORE' ? 'مخزون المحل' : 'مخزون الجملة'})</span>
+            <h3 className="text-sm font-bold text-[#7A1C32] flex items-center gap-2">
+              <Layers className="w-4 h-4 text-[#8A2B43]" />
+              <span>أقسام المتجر المتاحة بمخزون ({activeStockTab === 'DELIVERY' ? 'التوصيل' : activeStockTab === 'STORE' ? 'المحل' : 'الجملة'})</span>
             </h3>
-            <span className="text-xs font-bold text-gray-500">
-              إجمالي الأقسام النشطة: {categoryCardsList.filter((c) => c.count > 0).length}
+            <span className="text-xs font-mono font-bold text-gray-500">
+              إجمالي الأقسام: {categoryCardsList.length}
             </span>
           </div>
 
           {categoryCardsList.length === 0 ? (
-            <div className="bg-white rounded-3xl p-10 text-center border border-gray-100 shadow-card space-y-3">
-              <Package className="w-10 h-10 text-gray-300 mx-auto" />
-              <h4 className="text-sm font-bold text-gray-700">لا توجد أقسام مسجلة حالياً</h4>
-              <p className="text-xs text-gray-400">انتقل لتبويب "الأقسام والتصنيفات" لإضافة أقسام جديدة للمتجر.</p>
+            <div className="bg-white rounded-3xl p-10 text-center border border-gray-100 shadow-sm space-y-3">
+              <PackageCheck className="w-10 h-10 text-gray-300 mx-auto" />
+              <p className="text-xs text-gray-500 font-bold">لا توجد أقسام بمخزون متوفر حالياً</p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
               {categoryCardsList.map((cat) => (
                 <div
                   key={cat.id}
                   onClick={() => setSelectedCategoryId(cat.id)}
-                  className="bg-white p-6 rounded-3xl shadow-card border border-gray-100 cursor-pointer transition-all hover:border-[#8A2B43]/30 hover:scale-[1.02] hover:shadow-md group flex flex-col justify-between min-h-[160px]"
+                  className="bg-white p-5 rounded-3xl border border-gray-100 shadow-card hover:shadow-xl hover:border-[#8A2B43]/40 transition-all cursor-pointer group flex items-center gap-4 relative overflow-hidden"
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="w-12 h-12 rounded-2xl bg-pyjama-cream text-[#8A2B43] flex items-center justify-center border border-pyjama-pink/40 group-hover:bg-[#8A2B43] group-hover:text-white transition-colors">
-                      {cat.imageUrl ? (
-                        <img src={cat.imageUrl} alt={cat.name} className="w-full h-full object-cover rounded-2xl" />
-                      ) : (
-                        <Tag className="w-5 h-5" />
-                      )}
-                    </div>
-
-                    <span className="px-3 py-1 bg-pyjama-pink-soft text-[#8A2B43] rounded-full text-xs font-mono font-bold">
-                      {cat.count} منتجات
-                    </span>
+                  {/* Category Image / Icon */}
+                  <div className="w-14 h-14 rounded-2xl bg-pyjama-cream/80 border border-gray-200 flex items-center justify-center shrink-0 overflow-hidden group-hover:scale-105 transition-transform">
+                    {cat.imageUrl ? (
+                      <img src={cat.imageUrl} alt={cat.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <Layers className="w-6 h-6 text-[#8A2B43]" />
+                    )}
                   </div>
 
-                  <div>
-                    <h4 className="text-base font-bold text-pyjama-charcoal group-hover:text-[#8A2B43] transition-colors">
+                  {/* Category Info */}
+                  <div className="flex-1 min-w-0 space-y-1">
+                    <h4 className="text-sm font-bold text-pyjama-charcoal group-hover:text-[#8A2B43] transition-colors truncate">
                       {cat.name}
                     </h4>
-                    <p className="text-xs text-gray-400 mt-1 font-medium">اضغط لاستعراض كروت منتجات هذا القسم</p>
+                    <div className="flex items-center gap-1.5">
+                      <span className="px-2.5 py-0.5 bg-pyjama-pink-soft text-[#8A2B43] text-[11px] font-mono font-bold rounded-lg border border-pyjama-pink/30">
+                        {cat.count} منتج
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Arrow Indicator */}
+                  <div className="w-8 h-8 rounded-xl bg-pyjama-cream text-[#8A2B43] flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+                    <ArrowRight className="w-4 h-4 rotate-180" />
                   </div>
                 </div>
               ))}
@@ -216,9 +225,11 @@ export default function InventoryGrid({
                     {/* Top Bar inside Card */}
                     <div className="p-4 bg-pyjama-cream/30 border-b border-gray-100 flex items-center justify-between">
                       <div className="flex items-center gap-1.5">
-                        <span className="px-2.5 py-1 bg-pyjama-pink-soft text-[#8A2B43] text-[10px] font-bold rounded-lg border border-pyjama-pink/30">
-                          {product.categoryNameAr || 'منتج عام'}
-                        </span>
+                        {product.categoryNameAr && (
+                          <span className="px-2.5 py-1 bg-pyjama-pink-soft text-[#8A2B43] text-[10px] font-bold rounded-lg border border-pyjama-pink/30">
+                            {product.categoryNameAr}
+                          </span>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-1.5">
@@ -226,9 +237,10 @@ export default function InventoryGrid({
                           <Edit3 className="w-3 h-3" /> تعديل
                         </span>
                         <button
-                          onClick={(e) => handleDelete(e, product.id, product.nameAr)}
-                          className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                          title={`حذف المنتج من ${activeStockTab === 'DELIVERY' ? 'مخزون التوصيل' : activeStockTab === 'STORE' ? 'مخزون المحل' : 'مخزون الجملة'}`}
+                          type="button"
+                          onClick={(e) => handleDeleteProduct(product.id, e)}
+                          className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all z-10"
+                          title="حذف هذا المنتج"
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -238,8 +250,8 @@ export default function InventoryGrid({
                     {/* Main Card Content */}
                     <div className="p-5 space-y-4 flex-1">
                       {/* Product Image & Info Header */}
-                      <div className="flex gap-4 items-center">
-                        <div className="w-20 h-20 rounded-2xl bg-pyjama-cream border border-gray-100 overflow-hidden shrink-0 flex items-center justify-center">
+                      <div className="flex items-start gap-4">
+                        <div className="w-20 h-20 rounded-2xl bg-pyjama-cream border border-gray-200 overflow-hidden shrink-0 flex items-center justify-center shadow-inner">
                           {product.imageUrl ? (
                             <img
                               src={product.imageUrl}
@@ -247,154 +259,112 @@ export default function InventoryGrid({
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                             />
                           ) : (
-                            <Package className="w-8 h-8 text-gray-300" />
+                            <Package className="w-8 h-8 text-[#8A2B43]" />
                           )}
                         </div>
 
-                        <div className="space-y-1 min-w-0 flex-1">
-                          <h4 className="text-sm font-bold text-pyjama-charcoal line-clamp-2 leading-tight group-hover:text-[#8A2B43] transition-colors">
+                        <div className="space-y-1 flex-1 min-w-0">
+                          <h4 className="text-sm font-bold text-pyjama-charcoal line-clamp-2 leading-snug">
                             {product.nameAr}
                           </h4>
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="inline-block text-[11px] font-mono font-bold text-[#8A2B43] bg-pyjama-pink-soft/50 px-2 py-0.5 rounded-md">
-                              {product.sku}
-                            </span>
-                            {product.unitsPerSerie && (
-                              <span className="text-[10px] font-bold text-purple-900 bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
-                                {product.unitsPerSerie} قطعة / Série
-                              </span>
+                          <p className="text-xs font-mono text-gray-400 font-bold">
+                            SKU: {product.sku}
+                          </p>
+
+                          {/* Context Price Display */}
+                          <div className="pt-1 flex items-center gap-2 flex-wrap">
+                            {activeStockTab === 'WHOLESALE' ? (
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-black text-purple-900 font-mono">
+                                  {product.wholesalePrice || 0} د.ج
+                                </span>
+                                {product.superGrosPrice && (
+                                  <span className="text-[11px] font-bold text-purple-700 font-mono bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
+                                    سوبر: {product.superGrosPrice} د.ج
+                                  </span>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm font-black text-[#8A2B43] font-mono">
+                                  {product.sellingPrice || 0} د.ج
+                                </span>
+                                {product.oldPrice && (
+                                  <span className="text-xs text-gray-400 line-through font-mono">
+                                    {product.oldPrice} د.ج
+                                  </span>
+                                )}
+                              </div>
                             )}
                           </div>
-
-                          {product.supplierName && (
-                            <p className="text-[11px] text-gray-500 font-medium flex items-center gap-1 pt-0.5">
-                              <Building className="w-3 h-3 text-gray-400" />
-                              <span className="truncate">المورد: {product.supplierName}</span>
-                            </p>
-                          )}
                         </div>
                       </div>
 
-                      {/* Inline Multi-Stock & Variant Controls per Color & Size */}
-                      <div className="space-y-3 pt-2 border-t border-gray-100" onClick={(e) => e.stopPropagation()}>
-                        <span className="text-xs font-bold text-gray-700 flex items-center justify-between">
-                          <span>
-                            المخزون ({activeStockTab === 'DELIVERY' ? 'التوصيل' : activeStockTab === 'STORE' ? 'المحل' : 'الجملة'}):
-                          </span>
-                        </span>
+                      {/* Color & Size Breakdown per Color */}
+                      <div className="space-y-3 pt-3 border-t border-gray-100">
+                        {Object.entries(groupedColors).map(([colorName, colorVars]) => {
+                          const firstColorImg = colorVars?.[0]?.colorImageUrl || product.imageUrl;
 
-                        <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
-                          {Object.entries(groupedColors).map(([colorName, variantsList]) => (
-                            <div key={colorName} className="bg-pyjama-cream/20 p-2.5 rounded-2xl border border-gray-100 space-y-1.5">
-                              <div className="flex items-center gap-1.5">
-                                <span className="w-2.5 h-2.5 rounded-full bg-[#8A2B43]" />
-                                <span className="text-xs font-bold text-gray-800">{colorName}:</span>
+                          return (
+                            <div
+                              key={colorName}
+                              className="bg-pyjama-cream/40 p-3 rounded-2xl border border-gray-100 space-y-2"
+                            >
+                              <div className="flex items-center justify-between">
+                                <div className="flex items-center gap-2">
+                                  {firstColorImg ? (
+                                    <img
+                                      src={firstColorImg}
+                                      alt={colorName}
+                                      className="w-5 h-5 rounded-full object-cover border border-gray-200"
+                                    />
+                                  ) : (
+                                    <span className="w-3.5 h-3.5 rounded-full bg-[#8A2B43]" />
+                                  )}
+                                  <span className="text-xs font-bold text-pyjama-charcoal">
+                                    {colorName}
+                                  </span>
+                                </div>
                               </div>
 
-                              {/* Size Chips & Inline Qty Controls */}
-                              <div className="flex flex-wrap gap-2">
-                                {variantsList.map((variant) => {
-                                  const stockVal =
+                              {/* Size Stock Chips */}
+                              <div className="flex flex-wrap gap-1.5">
+                                {colorVars.map((v) => {
+                                  const stockQty =
                                     activeStockTab === 'DELIVERY'
-                                      ? variant.deliveryStock
+                                      ? v.deliveryStock
                                       : activeStockTab === 'STORE'
-                                      ? variant.storeStock
-                                      : variant.wholesaleStock;
+                                      ? v.storeStock
+                                      : v.wholesaleStock;
 
                                   return (
                                     <div
-                                      key={variant.id}
-                                      className="flex items-center gap-1 bg-white px-2 py-1 rounded-xl border border-gray-200 shadow-2xs"
+                                      key={v.id}
+                                      className={`px-2 py-1 rounded-xl text-[10px] font-mono font-bold border flex items-center gap-1 ${
+                                        stockQty > 0
+                                          ? 'bg-white text-pyjama-charcoal border-gray-200 shadow-xs'
+                                          : 'bg-rose-50 text-rose-500 border-rose-100 opacity-60'
+                                      }`}
                                     >
-                                      <span className="font-mono text-xs font-bold text-gray-700 ml-1">
-                                        {variant.size}
+                                      <span>{v.size}</span>
+                                      <span className="text-gray-300">•</span>
+                                      <span
+                                        className={
+                                          stockQty > 0
+                                            ? 'text-[#8A2B43] font-black'
+                                            : 'text-rose-500 font-black'
+                                        }
+                                      >
+                                        {stockQty}
                                       </span>
-
-                                      {/* Quick Counter Buttons [-] Qty [+] */}
-                                      <div className="flex items-center gap-1 dir-ltr">
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            onUpdateStock(
-                                              variant.id,
-                                              activeStockTab,
-                                              Math.max(0, stockVal - 1)
-                                            );
-                                          }}
-                                          className="w-5 h-5 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold flex items-center justify-center text-xs transition-all"
-                                        >
-                                          -
-                                        </button>
-                                        <span
-                                          className={`font-mono text-xs font-black px-1 ${
-                                            stockVal <= 3 ? 'text-rose-600' : 'text-[#8A2B43]'
-                                          }`}
-                                        >
-                                          {stockVal}
-                                        </span>
-                                        <button
-                                          type="button"
-                                          onClick={(e) => {
-                                            e.stopPropagation();
-                                            onUpdateStock(
-                                              variant.id,
-                                              activeStockTab,
-                                              stockVal + 1
-                                            );
-                                          }}
-                                          className="w-5 h-5 rounded-md bg-[#8A2B43] hover:bg-[#7A1C32] text-white font-bold flex items-center justify-center text-xs transition-all shadow-xs"
-                                        >
-                                          +
-                                        </button>
-                                      </div>
                                     </div>
                                   );
                                 })}
                               </div>
                             </div>
-                          ))}
-                        </div>
+                          );
+                        })}
                       </div>
-                    </div>
-
-                    {/* Card Footer: Multi-Tier Pricing Display */}
-                    <div className="p-4 bg-pyjama-cream/40 border-t border-gray-100 flex flex-col gap-1.5 text-xs font-mono">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <span className="text-[10px] text-gray-400 block font-sans">التكلفة (Achat):</span>
-                          <span className="font-bold text-gray-600">
-                            {product.costPrice ? `${product.costPrice.toLocaleString()} DZD` : '0 DZD'}
-                          </span>
-                        </div>
-
-                        <div className="text-left">
-                          <span className="text-[10px] text-[#8A2B43] block font-sans font-bold">التجزئة (Retail):</span>
-                          <span className="font-bold text-[#8A2B43] text-sm">
-                            {product.sellingPrice.toLocaleString()} DZD
-                          </span>
-                        </div>
-                      </div>
-
-                      {(product.wholesalePrice || product.superGrosPrice) && (
-                        <div className="flex items-center justify-between pt-1 border-t border-gray-200/60 text-[11px]">
-                          {product.wholesalePrice && (
-                            <div>
-                              <span className="text-[9px] text-purple-800 font-sans block">الجملة (Gros):</span>
-                              <span className="font-bold text-purple-900">{product.wholesalePrice.toLocaleString()} DZD</span>
-                            </div>
-                          )}
-
-                          {product.superGrosPrice && (
-                            <div className="text-left">
-                              <span className="text-[9px] text-purple-900 font-sans font-bold flex items-center gap-0.5">
-                                <Sparkles className="w-2.5 h-2.5 text-amber-600" /> Super Gros:
-                              </span>
-                              <span className="font-bold text-amber-700">{product.superGrosPrice.toLocaleString()} DZD</span>
-                            </div>
-                          )}
-                        </div>
-                      )}
                     </div>
                   </div>
                 );
