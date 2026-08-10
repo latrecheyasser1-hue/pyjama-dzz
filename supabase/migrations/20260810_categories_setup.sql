@@ -1,5 +1,4 @@
--- Supabase SQL Table Setup for Categories Module in Pyjama DZ Admin ERP
-
+-- 1. إنشاء جدول الأقسام (Categories Table Setup for Pyjama DZ Admin ERP)
 CREATE TABLE IF NOT EXISTS public.categories (
     id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
     name TEXT NOT NULL,
@@ -8,13 +7,15 @@ CREATE TABLE IF NOT EXISTS public.categories (
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
--- Enable RLS & set public read/write policy
+-- 2. تفعيل الصلاحيات (RLS Policies) باش السيستم يقدر يقرأ ويحفظ بلا مشاكل
 ALTER TABLE public.categories ENABLE ROW LEVEL SECURITY;
 
-DROP POLICY IF EXISTS "Allow public select on categories" ON public.categories;
-CREATE POLICY "Allow public select on categories" 
-ON public.categories FOR SELECT USING (true);
+DROP POLICY IF EXISTS "Allow full access to categories" ON public.categories;
+CREATE POLICY "Allow full access to categories" 
+ON public.categories 
+FOR ALL 
+USING (true) 
+WITH CHECK (true);
 
-DROP POLICY IF EXISTS "Allow public insert/update/delete on categories" ON public.categories;
-CREATE POLICY "Allow public insert/update/delete on categories" 
-ON public.categories FOR ALL USING (true);
+-- 3. تحديث الـ Schema Cache
+NOTIFY pgrst, 'reload schema';
