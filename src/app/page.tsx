@@ -5,10 +5,7 @@ import { Menu, Lock } from 'lucide-react';
 import PinLockScreen from '@/components/admin/PinLockScreen';
 import PinChangeModal from '@/components/admin/PinChangeModal';
 import AdminSidebar from '@/components/admin/AdminSidebar';
-import {
-  NotificationControls,
-  ToastNotificationContainer,
-} from '@/components/admin/NotificationBanner';
+import { ToastNotificationContainer } from '@/components/admin/NotificationBanner';
 
 // Custom Hooks
 import { useOrderNotification } from '@/hooks/useOrderNotification';
@@ -264,19 +261,11 @@ export default function MasterAdminPage() {
     setOrders((prev) => [newOrder, ...prev]);
   }, [orders.length]);
 
-  // Hook Initialization
+  // Hook Initialization (Always On sound notifications)
   const {
-    isMuted,
-    toggleSound,
-    playTestSound,
     toastAlerts,
     dismissToast,
   } = useOrderNotification(handleRealtimeNewOrder);
-
-  // Pure Test Audio Notification Trigger (Strictly plays sound only - NO state mutations or mock orders)
-  const handleTestSoundAlert = () => {
-    playTestSound();
-  };
 
   // Unconfirmed Orders Count
   const unconfirmedOrders = orders.filter((o) => o.status === 'UNCONFIRMED');
@@ -391,7 +380,7 @@ export default function MasterAdminPage() {
 
       {/* Main Content Area */}
       <main className="flex-1 lg:mr-72 p-4 sm:p-6 lg:p-8 space-y-6">
-        {/* Top Header Bar */}
+        {/* Clean Top Header Bar */}
         <header className="bg-white rounded-3xl p-4 sm:p-5 border border-gray-100 shadow-card flex items-center justify-between">
           <div className="flex items-center gap-3">
             <button
@@ -419,16 +408,8 @@ export default function MasterAdminPage() {
             </div>
           </div>
 
-          {/* Right Header Action Controls: Sound Toggle & Lock */}
+          {/* Clean Right Controls: Lock Screen Button Only */}
           <div className="flex items-center gap-3">
-            <NotificationControls
-              isMuted={isMuted}
-              onToggleSound={toggleSound}
-              toastAlerts={toastAlerts}
-              onDismissToast={dismissToast}
-              onTestSound={handleTestSoundAlert}
-            />
-
             <button
               onClick={() => setIsLocked(true)}
               className="p-2.5 rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition-all text-xs font-bold flex items-center gap-1.5"

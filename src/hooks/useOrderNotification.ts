@@ -13,42 +13,15 @@ export interface ToastAlert {
 }
 
 export function useOrderNotification(onNewOrderReceived?: (newOrderData: any) => void) {
-  const [isMuted, setIsMuted] = useState<boolean>(false);
   const [toastAlerts, setToastAlerts] = useState<ToastAlert[]>([]);
 
-  // Load sound mute setting from localStorage
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const savedMute = localStorage.getItem('pyjama_sound_muted');
-      if (savedMute !== null) {
-        setIsMuted(savedMute === 'true');
-      }
-    }
-  }, []);
-
-  const toggleSound = useCallback(() => {
-    setIsMuted((prev) => {
-      const nextState = !prev;
-      if (typeof window !== 'undefined') {
-        localStorage.setItem('pyjama_sound_muted', String(nextState));
-      }
-      return nextState;
-    });
-  }, []);
-
-  // Pure sound test function: strictly plays audio without altering orders state
-  const playTestSound = useCallback(() => {
-    playNewOrderChime();
-  }, []);
-
+  // Trigger alert logic when a genuine new order is inserted in database
   const triggerNewOrderAlert = useCallback(
     (orderData?: any) => {
-      // Play sound chime if sound is enabled
-      if (!isMuted) {
-        playNewOrderChime();
-      }
+      // PERMANENTLY ENABLED SOUND: Automatically play audio chime on every incoming order
+      playNewOrderChime();
 
-      // Add visual toast notification with guaranteed unique ID
+      // Add visual toast notification
       const uniqueId = `toast-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
       const newToast: ToastAlert = {
         id: uniqueId,
@@ -72,14 +45,14 @@ export function useOrderNotification(onNewOrderReceived?: (newOrderData: any) =>
         onNewOrderReceived(orderData);
       }
     },
-    [isMuted, onNewOrderReceived]
+    [onNewOrderReceived]
   );
 
   const dismissToast = useCallback((id: string) => {
     setToastAlerts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  // Supabase Realtime Subscription: ONLY genuine DB inserts trigger state updates
+  // Supabase Realtime Subscription: ALWAYS ACTIVE
   useEffect(() => {
     const channel = supabase
       .channel('public:orders')
@@ -125,9 +98,6 @@ export function useOrderNotification(onNewOrderReceived?: (newOrderData: any) =>
   }, []);
 
   return {
-    isMuted,
-    toggleSound,
-    playTestSound,
     toastAlerts,
     dismissToast,
     triggerNewOrderAlert,

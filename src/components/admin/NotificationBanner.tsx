@@ -1,59 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Volume2, VolumeX, Bell, X, Sparkles, Package } from 'lucide-react';
+import { X, Package } from 'lucide-react';
 import { ToastAlert } from '@/hooks/useOrderNotification';
-
-interface NotificationControlsProps {
-  isMuted: boolean;
-  onToggleSound: () => void;
-  toastAlerts: ToastAlert[];
-  onDismissToast: (id: string) => void;
-  onTestSound: () => void;
-}
-
-export function NotificationControls({
-  isMuted,
-  onToggleSound,
-  onTestSound,
-}: NotificationControlsProps) {
-  return (
-    <div className="flex items-center gap-2">
-      {/* Test Sound Button */}
-      <button
-        onClick={onTestSound}
-        className="px-3 py-1.5 rounded-xl bg-pyjama-pink-soft text-[#8A2B43] hover:bg-[#8A2B43] hover:text-white transition-all text-xs font-bold flex items-center gap-1.5 border border-pyjama-pink/40"
-        title="تجربة صوت التنبيه (Test Order Sound Chime)"
-      >
-        <Sparkles className="w-3.5 h-3.5 text-[#8A2B43]" />
-        <span className="hidden md:inline">تجربة التنبيه الصوتية</span>
-      </button>
-
-      {/* Sound Toggle Speaker Button */}
-      <button
-        onClick={onToggleSound}
-        className={`p-2.5 rounded-xl border transition-all flex items-center gap-1.5 text-xs font-bold ${
-          isMuted
-            ? 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100'
-            : 'bg-emerald-50 border-emerald-200 text-emerald-800 hover:bg-emerald-100'
-        }`}
-        title={isMuted ? 'تفعيل التنبيهات الصوتية' : 'كتم التنبيهات الصوتية'}
-      >
-        {isMuted ? (
-          <>
-            <VolumeX className="w-4 h-4 text-rose-600" />
-            <span className="hidden sm:inline">الصوت مكتوم</span>
-          </>
-        ) : (
-          <>
-            <Volume2 className="w-4 h-4 text-emerald-600 animate-pulse" />
-            <span className="hidden sm:inline">الصوت مفعل</span>
-          </>
-        )}
-      </button>
-    </div>
-  );
-}
 
 export function ToastNotificationContainer({
   toastAlerts,
