@@ -20,6 +20,11 @@ import {
   Pipette,
   UploadCloud,
   Check,
+  Layers,
+  ShoppingBag,
+  Store,
+  Boxes,
+  HelpCircle,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { Category, Product, ProductVariant, Supplier } from '@/types/admin';
@@ -65,7 +70,10 @@ interface ColorInputItem {
   colorName: string;
   colorHex: string;
   imageUrl: string;
-  sizeStocks: Record<string, number>;
+  // Multi-warehouse independent stocks per size
+  deliveryStocks: Record<string, number>;
+  storeStocks: Record<string, number>;
+  wholesaleStocks: Record<string, number>;
   activeSizes: string[];
 }
 
@@ -77,6 +85,9 @@ export default function AddProductModal({
   reFetchProducts,
   productToEdit,
 }: AddProductModalProps) {
+  // Sales Mode Toggle (Toggles visibility of Supplier Info)
+  const [salesTargetMode, setSalesTargetMode] = useState<'RETAIL' | 'WHOLESALE' | 'BOTH'>('BOTH');
+
   // Basic Info Form State
   const [nameAr, setNameAr] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -90,12 +101,22 @@ export default function AddProductModal({
   const [sellingPrice, setSellingPrice] = useState<number | ''>('');
   const [oldPrice, setOldPrice] = useState<number | ''>('');
   const [wholesalePrice, setWholesalePrice] = useState<number | ''>('');
+  const [superGrosPrice, setSuperGrosPrice] = useState<number | ''>('');
+
+  // Advanced Wholesale System State
+  const [unitsPerSerie, setUnitsPerSerie] = useState<number>(4);
+  const [minWholesaleSeries, setMinWholesaleSeries] = useState<number>(1);
+  const [superGrosThreshold, setSuperGrosThreshold] = useState<number>(10);
+  const [isSurCommande, setIsSurCommande] = useState<boolean>(false);
 
   // Flexible Size System State
   const [sizeCategory, setSizeCategory] = useState<SizeCategoryKey>('CLOTHING');
   const [isStandardSize, setIsStandardSize] = useState(false);
   const [minSize, setMinSize] = useState('S');
   const [maxSize, setMaxSize] = useState('XL');
+
+  // Active Stock Warehouse Tab for Multi-Warehouse Input
+  const [activeStockTab, setActiveStockTab] = useState<'DELIVERY' | 'STORE' | 'WHOLESALE'>('DELIVERY');
 
   // Color Variants State
   const [colors, setColors] = useState<ColorInputItem[]>([
@@ -104,7 +125,9 @@ export default function AddProductModal({
       colorName: 'Burgundy (عنابي)',
       colorHex: '#8A2B43',
       imageUrl: '',
-      sizeStocks: { S: 10, M: 10, L: 10, XL: 10 },
+      deliveryStocks: { S: 10, M: 10, L: 10, XL: 10 },
+      storeStocks: { S: 5, M: 5, L: 5, XL: 5 },
+      wholesaleStocks: { S: 20, M: 20, L: 20, XL: 20 },
       activeSizes: ['S', 'M', 'L', 'XL'],
     },
   ]);
@@ -123,6 +146,7 @@ export default function AddProductModal({
 
   // Form Reset
   const resetForm = () => {
+    setSalesTargetMode('BOTH');
     setNameAr('');
     setSelectedSupplierId('');
     setSupplierName('');
@@ -132,17 +156,25 @@ export default function AddProductModal({
     setSellingPrice('');
     setOldPrice('');
     setWholesalePrice('');
+    setSuperGrosPrice('');
+    setUnitsPerSerie(4);
+    setMinWholesaleSeries(1);
+    setSuperGrosThreshold(10);
+    setIsSurCommande(false);
     setSizeCategory('CLOTHING');
     setIsStandardSize(false);
     setMinSize('S');
     setMaxSize('XL');
+    setActiveStockTab('DELIVERY');
     setColors([
       {
         id: 'c-1',
         colorName: 'Burgundy (عنابي)',
         colorHex: '#8A2B43',
         imageUrl: '',
-        sizeStocks: { S: 10, M: 10, L: 10, XL: 10 },
+        deliveryStocks: { S: 10, M: 10, L: 10, XL: 10 },
+        storeStocks: { S: 5, M: 5, L: 5, XL: 5 },
+        wholesaleStocks: { S: 20, M: 20, L: 20, XL: 20 },
         activeSizes: ['S', 'M', 'L', 'XL'],
       },
     ]);
@@ -214,6 +246,11 @@ export default function AddProductModal({
       setSellingPrice(productToEdit.sellingPrice ?? '');
       setOldPrice(productToEdit.oldPrice ?? '');
       setWholesalePrice(productToEdit.wholesalePrice ?? '');
+      setSuperGrosPrice(productToEdit.superGrosPrice ?? '');
+      setUnitsPerSerie(productToEdit.unitsPerSerie ?? 4);
+      setMinWholesaleSeries(productToEdit.minWholesaleSeries ?? 1);
+      setSuperGrosThreshold(productToEdit.superGrosThreshold ?? 10);
+      setIsSurCommande(productToEdit.isSurCommande ?? false);
       setDescription(productToEdit.description || '');
 
       if (productToEdit.colors && productToEdit.colors.length > 0) {
@@ -221,10 +258,14 @@ export default function AddProductModal({
           const colorName = c.colorName;
           const colorVariants = productToEdit.variants?.filter((v) => v.color === colorName) || [];
           const activeSizes = colorVariants.map((v) => v.size);
-          const sizeStocks: Record<string, number> = {};
+          const delStocks: Record<string, number> = {};
+          const storeStocks: Record<string, number> = {};
+          const wsStocks: Record<string, number> = {};
 
           colorVariants.forEach((v) => {
-            sizeStocks[v.size] = v.deliveryStock;
+            delStocks[v.size] = v.deliveryStock;
+            storeStocks[v.size] = v.storeStock;
+            wsStocks[v.size] = v.wholesaleStock;
           });
 
           return {
@@ -232,7 +273,9 @@ export default function AddProductModal({
             colorName: colorName,
             colorHex: '#8A2B43',
             imageUrl: c.imageUrl || productToEdit.imageUrl || '',
-            sizeStocks,
+            deliveryStocks: delStocks,
+            storeStocks: storeStocks,
+            wholesaleStocks: wsStocks,
             activeSizes: activeSizes.length > 0 ? activeSizes : ['S', 'M', 'L', 'XL'],
           };
         });
@@ -246,11 +289,16 @@ export default function AddProductModal({
         });
 
         const colorItems: ColorInputItem[] = Object.entries(colorGroups).map(([colName, vars], idx) => {
-          const sizeStocks: Record<string, number> = {};
+          const delStocks: Record<string, number> = {};
+          const storeStocks: Record<string, number> = {};
+          const wsStocks: Record<string, number> = {};
           const activeSizes: string[] = [];
+
           vars.forEach((v) => {
             activeSizes.push(v.size);
-            sizeStocks[v.size] = v.deliveryStock;
+            delStocks[v.size] = v.deliveryStock;
+            storeStocks[v.size] = v.storeStock;
+            wsStocks[v.size] = v.wholesaleStock;
           });
 
           return {
@@ -258,7 +306,9 @@ export default function AddProductModal({
             colorName: colName,
             colorHex: '#8A2B43',
             imageUrl: productToEdit.imageUrl || '',
-            sizeStocks,
+            deliveryStocks: delStocks,
+            storeStocks: storeStocks,
+            wholesaleStocks: wsStocks,
             activeSizes,
           };
         });
@@ -325,9 +375,14 @@ export default function AddProductModal({
 
   // Color Handlers
   const handleAddColor = () => {
-    const initialStocks: Record<string, number> = {};
+    const initDel: Record<string, number> = {};
+    const initStore: Record<string, number> = {};
+    const initWs: Record<string, number> = {};
+
     generatedSizesList.forEach((s) => {
-      initialStocks[s] = 10;
+      initDel[s] = 10;
+      initStore[s] = 5;
+      initWs[s] = 20;
     });
 
     setColors((prev) => [
@@ -337,7 +392,9 @@ export default function AddProductModal({
         colorName: '',
         colorHex: '#8A2B43',
         imageUrl: '',
-        sizeStocks: initialStocks,
+        deliveryStocks: initDel,
+        storeStocks: initStore,
+        wholesaleStocks: initWs,
         activeSizes: [...generatedSizesList],
       },
     ]);
@@ -427,14 +484,22 @@ export default function AddProductModal({
     );
   };
 
+  // Update Stock Quantities per Warehouse Tab
   const handleUpdateStockQuantity = (colorId: string, size: string, qty: number) => {
     setColors((prev) =>
       prev.map((c) => {
         if (c.id !== colorId) return c;
+        const targetMapKey =
+          activeStockTab === 'DELIVERY'
+            ? 'deliveryStocks'
+            : activeStockTab === 'STORE'
+            ? 'storeStocks'
+            : 'wholesaleStocks';
+
         return {
           ...c,
-          sizeStocks: {
-            ...c.sizeStocks,
+          [targetMapKey]: {
+            ...c[targetMapKey],
             [size]: Math.max(0, qty),
           },
         };
@@ -469,6 +534,7 @@ export default function AddProductModal({
       delivery_stock: r.delivery_stock,
       store_stock: r.store_stock,
       wholesale_stock: r.wholesale_stock,
+      is_sur_commande: r.is_sur_commande,
     }));
 
     let { error: err1 } = await supabase.from('product_variants').insert(fallbackRows1);
@@ -494,7 +560,7 @@ export default function AddProductModal({
     return false;
   };
 
-  // Synchronous Supabase Insert/Update with Explicit Error alerts & toasts
+  // Synchronous Supabase Insert/Update
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -519,17 +585,22 @@ export default function AddProductModal({
     setIsSubmitting(true);
 
     try {
-      // 1. Base Product Payload
+      // 1. Base Product Payload with Wholesale & Super Gros fields
       const productPayload = {
         name: nameAr.trim(),
         sku: finalSku,
         category_id: categoryId || null,
-        supplier_name: supplierName.trim() || null,
-        supplier_phone: supplierPhone.trim() || null,
+        supplier_name: salesTargetMode === 'WHOLESALE' ? null : supplierName.trim() || null,
+        supplier_phone: salesTargetMode === 'WHOLESALE' ? null : supplierPhone.trim() || null,
         cost_price: Number(costPrice) || 0,
         selling_price: Number(sellingPrice) || 0,
         old_price: oldPrice !== '' ? Number(oldPrice) : null,
         wholesale_price: wholesalePrice !== '' ? Number(wholesalePrice) : null,
+        super_gros_price: superGrosPrice !== '' ? Number(superGrosPrice) : null,
+        units_per_serie: Number(unitsPerSerie) || 4,
+        min_wholesale_series: Number(minWholesaleSeries) || 1,
+        super_gros_threshold: Number(superGrosThreshold) || 10,
+        is_sur_commande: isSurCommande,
         description: description.trim() || null,
         image_url: activeColors[0]?.imageUrl || null,
       };
@@ -539,15 +610,19 @@ export default function AddProductModal({
       const generatedVariants: ProductVariant[] = [];
       activeColors.forEach((c) => {
         c.activeSizes.forEach((s) => {
-          const stockVal = c.sizeStocks[s] !== undefined ? c.sizeStocks[s] : 10;
+          const delVal = c.deliveryStocks[s] !== undefined ? c.deliveryStocks[s] : 10;
+          const storeVal = c.storeStocks[s] !== undefined ? c.storeStocks[s] : 5;
+          const wsVal = isSurCommande ? 0 : c.wholesaleStocks[s] !== undefined ? c.wholesaleStocks[s] : 20;
+
           generatedVariants.push({
             id: `v-${Date.now()}-${c.colorName}-${s}`,
             productId: isEditMode && productToEdit ? productToEdit.id : '',
             size: s,
             color: c.colorName.trim(),
-            deliveryStock: stockVal,
-            storeStock: stockVal,
-            wholesaleStock: stockVal,
+            deliveryStock: delVal,
+            storeStock: storeVal,
+            wholesaleStock: wsVal,
+            isSurCommande: isSurCommande,
           });
         });
       });
@@ -572,16 +647,20 @@ export default function AddProductModal({
         const variantRows: any[] = [];
         activeColors.forEach((c) => {
           c.activeSizes.forEach((s) => {
-            const stockVal = c.sizeStocks[s] !== undefined ? c.sizeStocks[s] : 10;
+            const delVal = c.deliveryStocks[s] !== undefined ? c.deliveryStocks[s] : 10;
+            const storeVal = c.storeStocks[s] !== undefined ? c.storeStocks[s] : 5;
+            const wsVal = isSurCommande ? 0 : c.wholesaleStocks[s] !== undefined ? c.wholesaleStocks[s] : 20;
+
             variantRows.push({
               product_id: productToEdit.id,
               color_name: c.colorName.trim(),
               color_image_url: c.imageUrl.trim() || null,
               size: s,
               size_name: s,
-              delivery_stock: stockVal,
-              store_stock: stockVal,
-              wholesale_stock: stockVal,
+              delivery_stock: delVal,
+              store_stock: storeVal,
+              wholesale_stock: wsVal,
+              is_sur_commande: isSurCommande,
             });
           });
         });
@@ -598,12 +677,17 @@ export default function AddProductModal({
           nameAr: nameAr.trim(),
           categoryId: categoryId || undefined,
           categoryNameAr: selectedCat?.name || undefined,
-          supplierName: supplierName.trim() || undefined,
-          supplierPhone: supplierPhone.trim() || undefined,
+          supplierName: salesTargetMode === 'WHOLESALE' ? undefined : supplierName.trim() || undefined,
+          supplierPhone: salesTargetMode === 'WHOLESALE' ? undefined : supplierPhone.trim() || undefined,
           costPrice: Number(costPrice) || 0,
           sellingPrice: Number(sellingPrice) || 0,
           oldPrice: oldPrice !== '' ? Number(oldPrice) : null,
           wholesalePrice: wholesalePrice !== '' ? Number(wholesalePrice) : null,
+          superGrosPrice: superGrosPrice !== '' ? Number(superGrosPrice) : null,
+          unitsPerSerie: Number(unitsPerSerie) || 4,
+          minWholesaleSeries: Number(minWholesaleSeries) || 1,
+          superGrosThreshold: Number(superGrosThreshold) || 10,
+          isSurCommande: isSurCommande,
           description: description.trim() || undefined,
           imageUrl: activeColors[0]?.imageUrl || undefined,
           colors: activeColors.map((c) => ({ colorName: c.colorName, imageUrl: c.imageUrl })),
@@ -644,16 +728,20 @@ export default function AddProductModal({
           const variantRows: any[] = [];
           activeColors.forEach((c) => {
             c.activeSizes.forEach((s) => {
-              const stockVal = c.sizeStocks[s] !== undefined ? c.sizeStocks[s] : 10;
+              const delVal = c.deliveryStocks[s] !== undefined ? c.deliveryStocks[s] : 10;
+              const storeVal = c.storeStocks[s] !== undefined ? c.storeStocks[s] : 5;
+              const wsVal = isSurCommande ? 0 : c.wholesaleStocks[s] !== undefined ? c.wholesaleStocks[s] : 20;
+
               variantRows.push({
                 product_id: insertedProductId,
                 color_name: c.colorName.trim(),
                 color_image_url: c.imageUrl.trim() || null,
                 size: s,
                 size_name: s,
-                delivery_stock: stockVal,
-                store_stock: stockVal,
-                wholesale_stock: stockVal,
+                delivery_stock: delVal,
+                store_stock: storeVal,
+                wholesale_stock: wsVal,
+                is_sur_commande: isSurCommande,
               });
             });
           });
@@ -671,12 +759,17 @@ export default function AddProductModal({
           nameAr: nameAr.trim(),
           categoryId: categoryId || undefined,
           categoryNameAr: selectedCat?.name || undefined,
-          supplierName: supplierName.trim() || undefined,
-          supplierPhone: supplierPhone.trim() || undefined,
+          supplierName: salesTargetMode === 'WHOLESALE' ? undefined : supplierName.trim() || undefined,
+          supplierPhone: salesTargetMode === 'WHOLESALE' ? undefined : supplierPhone.trim() || undefined,
           costPrice: Number(costPrice) || 0,
           sellingPrice: Number(sellingPrice) || 0,
           oldPrice: oldPrice !== '' ? Number(oldPrice) : null,
           wholesalePrice: wholesalePrice !== '' ? Number(wholesalePrice) : null,
+          superGrosPrice: superGrosPrice !== '' ? Number(superGrosPrice) : null,
+          unitsPerSerie: Number(unitsPerSerie) || 4,
+          minWholesaleSeries: Number(minWholesaleSeries) || 1,
+          superGrosThreshold: Number(superGrosThreshold) || 10,
+          isSurCommande: isSurCommande,
           description: description.trim() || undefined,
           imageUrl: activeColors[0]?.imageUrl || undefined,
           colors: activeColors.map((c) => ({ colorName: c.colorName, imageUrl: c.imageUrl })),
@@ -721,7 +814,7 @@ export default function AddProductModal({
                 {isEditMode ? 'تعديل بيانات المنتج (Edit Product)' : 'إضافة منتج جديد (Add New Product)'}
               </h2>
               <p className="text-xs text-white/80 mt-0.5">
-                {isEditMode ? 'تحديث الأسعار والألوان والمقاسات والموردين' : 'رفع الصور المباشر، قطارة الألوان، وتحديد كميات المقاسات لكل لون'}
+                إسناد المخزون المستقل للمستودعات 3 + إعدادات البيع بالجملة و(السوبر قرو) ونظام السلسلة
               </p>
             </div>
           </div>
@@ -735,13 +828,40 @@ export default function AddProductModal({
           </button>
         </div>
 
+        {/* Sales Target Mode Selector */}
+        <div className="px-6 pt-4 bg-pyjama-cream/30 border-b border-gray-100 flex items-center gap-2">
+          <span className="text-xs font-bold text-gray-600 ml-2">نوع العرض والبيع:</span>
+          <button
+            type="button"
+            onClick={() => setSalesTargetMode('BOTH')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              salesTargetMode === 'BOTH'
+                ? 'bg-[#8A2B43] text-white shadow-sm'
+                : 'bg-white text-gray-600 border border-gray-200'
+            }`}
+          >
+            تجزئة + جملة (عام)
+          </button>
+          <button
+            type="button"
+            onClick={() => setSalesTargetMode('WHOLESALE')}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              salesTargetMode === 'WHOLESALE'
+                ? 'bg-[#8A2B43] text-white shadow-sm'
+                : 'bg-white text-gray-600 border border-gray-200'
+            }`}
+          >
+            جملة فقط (Wholesale Only)
+          </button>
+        </div>
+
         {/* Modal Scrollable Body Form */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-8 flex-1">
-          {/* SECTION A: Basic Info & Dynamic Supplier Integration */}
+          {/* SECTION A: Basic Info & Supplier Integration */}
           <div className="space-y-4 bg-pyjama-cream/40 p-5 rounded-3xl border border-gray-100">
             <h3 className="text-sm font-bold text-[#7A1C32] flex items-center gap-2 border-b border-gray-200/80 pb-3">
               <Grid className="w-4 h-4 text-[#8A2B43]" />
-              <span>أولاً: البيانات الأساسية والمورّد (Basic Info & Supplier)</span>
+              <span>أولاً: البيانات الأساسية {salesTargetMode !== 'WHOLESALE' && 'والمورّد'}</span>
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -808,54 +928,59 @@ export default function AddProductModal({
                 </div>
               </div>
 
-              {/* Supplier Dropdown */}
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  اختيار المورّد / الورشة (Supplier Name)
-                </label>
-                <div className="relative">
-                  <Truck className="w-4 h-4 text-gray-400 absolute right-3 top-3.5" />
-                  <select
-                    value={selectedSupplierId}
-                    onChange={(e) => handleSupplierChange(e.target.value)}
-                    className="w-full pr-10 pl-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-bold focus:outline-none focus:border-[#8A2B43] shadow-sm"
-                  >
-                    <option value="">-- اختر المورّد من القائمة المسجلة --</option>
-                    {suppliers.map((sup) => (
-                      <option key={sup.id} value={sup.id}>
-                        {sup.name} ({sup.phone || 'بدون هاتف'})
-                      </option>
-                    ))}
-                    <option value="CUSTOM">+ أدخل مورد جديد يدوياً</option>
-                  </select>
-                </div>
-                {selectedSupplierId === 'CUSTOM' && (
-                  <input
-                    type="text"
-                    value={supplierName}
-                    onChange={(e) => setSupplierName(e.target.value)}
-                    placeholder="اكتب اسم المورد الجديد يدوياً..."
-                    className="w-full mt-2 px-4 py-2.5 bg-white rounded-xl border border-gray-200 text-xs font-bold focus:outline-none focus:border-[#8A2B43]"
-                  />
-                )}
-              </div>
+              {/* HIDE SUPPLIER FIELD IN DEDICATED WHOLESALE MODE */}
+              {salesTargetMode !== 'WHOLESALE' && (
+                <>
+                  {/* Supplier Dropdown */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      اختيار المورّد / الورشة (Supplier Name)
+                    </label>
+                    <div className="relative">
+                      <Truck className="w-4 h-4 text-gray-400 absolute right-3 top-3.5" />
+                      <select
+                        value={selectedSupplierId}
+                        onChange={(e) => handleSupplierChange(e.target.value)}
+                        className="w-full pr-10 pl-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-bold focus:outline-none focus:border-[#8A2B43] shadow-sm"
+                      >
+                        <option value="">-- اختر المورّد من القائمة المسجلة --</option>
+                        {suppliers.map((sup) => (
+                          <option key={sup.id} value={sup.id}>
+                            {sup.name} ({sup.phone || 'بدون هاتف'})
+                          </option>
+                        ))}
+                        <option value="CUSTOM">+ أدخل مورد جديد يدوياً</option>
+                      </select>
+                    </div>
+                    {selectedSupplierId === 'CUSTOM' && (
+                      <input
+                        type="text"
+                        value={supplierName}
+                        onChange={(e) => setSupplierName(e.target.value)}
+                        placeholder="اكتب اسم المورد الجديد يدوياً..."
+                        className="w-full mt-2 px-4 py-2.5 bg-white rounded-xl border border-gray-200 text-xs font-bold focus:outline-none focus:border-[#8A2B43]"
+                      />
+                    )}
+                  </div>
 
-              {/* Auto-Filled Supplier Phone */}
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  رقم هاتف المورّد (Supplier Phone)
-                </label>
-                <div className="relative">
-                  <Phone className="w-4 h-4 text-gray-400 absolute right-3 top-3.5" />
-                  <input
-                    type="text"
-                    value={supplierPhone}
-                    onChange={(e) => setSupplierPhone(e.target.value)}
-                    placeholder="يتم ملؤه تلقائياً..."
-                    className="w-full pr-10 pl-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold focus:outline-none focus:border-[#8A2B43] shadow-sm"
-                  />
-                </div>
-              </div>
+                  {/* Auto-Filled Supplier Phone */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      رقم هاتف المورّد (Supplier Phone)
+                    </label>
+                    <div className="relative">
+                      <Phone className="w-4 h-4 text-gray-400 absolute right-3 top-3.5" />
+                      <input
+                        type="text"
+                        value={supplierPhone}
+                        onChange={(e) => setSupplierPhone(e.target.value)}
+                        placeholder="يتم ملؤه تلقائياً..."
+                        className="w-full pr-10 pl-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold focus:outline-none focus:border-[#8A2B43] shadow-sm"
+                      />
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
@@ -864,7 +989,7 @@ export default function AddProductModal({
             <div className="flex items-center justify-between border-b border-gray-200/80 pb-3">
               <h3 className="text-sm font-bold text-[#7A1C32] flex items-center gap-2">
                 <DollarSign className="w-4 h-4 text-[#8A2B43]" />
-                <span>ثانياً: الأسعار والتخفيضات والخصم عند شراء 5 حبات (DZD Pricing)</span>
+                <span>ثانياً: هيكلة الأسعار والتخفيضات (DZD Pricing)</span>
               </h3>
 
               {discountPercent !== null && (
@@ -876,36 +1001,36 @@ export default function AddProductModal({
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* 1. Purchase Cost Price */}
+              {/* Cost Price */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">
-                  سعر الشراء / التكلفة (DZD)
+                  سعر الشراء / التكلفة (Achat DZD)
                 </label>
                 <input
                   type="number"
                   value={costPrice}
                   onChange={(e) => setCostPrice(e.target.value === '' ? '' : Number(e.target.value))}
-                  placeholder=""
+                  placeholder="0"
                   className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold focus:outline-none focus:border-[#8A2B43] shadow-sm"
                 />
               </div>
 
-              {/* 2. Current Selling Price */}
+              {/* Current Selling Price (Retail) */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">
-                  سعر البيع للتجزئة (DZD) <span className="text-rose-500">*</span>
+                  سعر البيع بالتجزئة (Vente DZD) <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="number"
                   value={sellingPrice}
                   onChange={(e) => setSellingPrice(e.target.value === '' ? '' : Number(e.target.value))}
-                  placeholder=""
+                  placeholder="0"
                   className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold text-[#8A2B43] focus:outline-none focus:border-[#8A2B43] shadow-sm"
                   required
                 />
               </div>
 
-              {/* 3. Old Price Before Discount */}
+              {/* Old Price Before Discount */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">
                   السعر القديم قبل الخصم (DZD)
@@ -914,33 +1039,127 @@ export default function AddProductModal({
                   type="number"
                   value={oldPrice}
                   onChange={(e) => setOldPrice(e.target.value === '' ? '' : Number(e.target.value))}
-                  placeholder=""
+                  placeholder="0"
                   className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold text-gray-400 focus:outline-none focus:border-[#8A2B43] shadow-sm"
                 />
               </div>
 
-              {/* 4. 5+ Units Retail Incentive Price */}
+              {/* Standard Wholesale Price */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">
-                  سعر الخصم عند شراء 5 حبات فما فوق (DZD)
+                  سعر البيع بالجملة (Prix Gros DZD)
                 </label>
                 <input
                   type="number"
                   value={wholesalePrice}
                   onChange={(e) => setWholesalePrice(e.target.value === '' ? '' : Number(e.target.value))}
-                  placeholder=""
+                  placeholder="0"
                   className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-[#8A2B43] shadow-sm"
                 />
               </div>
             </div>
           </div>
 
-          {/* SECTION C: Flexible Size Selection System */}
+          {/* SECTION C: DEDICATED WHOLESALE (مخزون الجملة) BUSINESS LOGIC */}
+          <div className="space-y-5 bg-purple-50/50 p-5 rounded-3xl border border-purple-100">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-purple-200/80 pb-3">
+              <h3 className="text-sm font-bold text-purple-900 flex items-center gap-2">
+                <Boxes className="w-5 h-5 text-purple-700" />
+                <span>ثالثاً: نظام الجملة المتقدم وسعر (السوبر قرو) ونظام السلسلة (Wholesale System)</span>
+              </h3>
+
+              {/* Sur Commande / Made to Order Checkbox Toggle */}
+              <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-1.5 rounded-xl border border-purple-200 shadow-xs">
+                <input
+                  type="checkbox"
+                  checked={isSurCommande}
+                  onChange={(e) => setIsSurCommande(e.target.checked)}
+                  className="w-4 h-4 accent-purple-800 rounded cursor-pointer"
+                />
+                <span className="text-xs font-bold text-purple-900">
+                  متوفر على الطلب (Sur Commande / Made to Order)
+                </span>
+              </label>
+            </div>
+
+            {/* Wholesale Thresholds & Pricing Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              {/* 1. Super Gros Price */}
+              <div>
+                <label className="block text-xs font-bold text-purple-900 mb-1">
+                  سعر الجملة الكبيرة (Prix Super Gros DZD)
+                </label>
+                <input
+                  type="number"
+                  value={superGrosPrice}
+                  onChange={(e) => setSuperGrosPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                  placeholder="مثال: 2800"
+                  className="w-full px-4 py-3 bg-white rounded-xl border border-purple-200 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-purple-800 shadow-sm"
+                />
+              </div>
+
+              {/* 2. Units Per Serie */}
+              <div>
+                <label className="block text-xs font-bold text-purple-900 mb-1">
+                  عدد القطع في السلسلة (Pack Size / Série)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={unitsPerSerie}
+                  onChange={(e) => setUnitsPerSerie(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-full px-4 py-3 bg-white rounded-xl border border-purple-200 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-purple-800 shadow-sm"
+                />
+              </div>
+
+              {/* 3. Minimum Series for Wholesale */}
+              <div>
+                <label className="block text-xs font-bold text-purple-900 mb-1">
+                  أقل عدد سريات للجملة (Min Séries)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={minWholesaleSeries}
+                  onChange={(e) => setMinWholesaleSeries(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-full px-4 py-3 bg-white rounded-xl border border-purple-200 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-purple-800 shadow-sm"
+                />
+              </div>
+
+              {/* 4. Super Gros Series Threshold */}
+              <div>
+                <label className="block text-xs font-bold text-purple-900 mb-1">
+                  عتبة السوبر قرو (Super Gros Threshold)
+                </label>
+                <input
+                  type="number"
+                  min="1"
+                  value={superGrosThreshold}
+                  onChange={(e) => setSuperGrosThreshold(Math.max(1, parseInt(e.target.value) || 1))}
+                  className="w-full px-4 py-3 bg-white rounded-xl border border-purple-200 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-purple-800 shadow-sm"
+                />
+              </div>
+            </div>
+
+            <div className="p-3.5 bg-white/80 rounded-2xl border border-purple-200 text-xs text-purple-900 space-y-1">
+              <p className="font-bold flex items-center gap-1.5">
+                <HelpCircle className="w-4 h-4 text-purple-700" />
+                <span>قواعد نظام السلسلة والطلب المسبق:</span>
+              </p>
+              <ul className="list-disc list-inside space-y-0.5 text-[11px] text-purple-800 font-medium pr-2">
+                <li>كل سلسلة (Série) تخصص رسمياً لـ <strong>لون واحد فقط</strong> بمقاسات مختلفة.</li>
+                <li>تفعيل <strong>Sur Commande (الطلب المسبق)</strong> يعطّل أعداد المخزون الحقيقي للجملة ويعرض المنتج كمتاح للطلب المصنّعي.</li>
+                <li>الوصول إلى {superGrosThreshold} سريات يفعّل تلقائياً سعر <strong>السوبر قرو ({superGrosPrice || 0} DZD)</strong> في فاتورة التاجر.</li>
+              </ul>
+            </div>
+          </div>
+
+          {/* SECTION D: Flexible Size Selection System */}
           <div className="space-y-5 bg-pyjama-cream/40 p-5 rounded-3xl border border-gray-100">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-gray-200/80 pb-3">
               <h3 className="text-sm font-bold text-[#7A1C32] flex items-center gap-2">
                 <Ruler className="w-4 h-4 text-[#8A2B43]" />
-                <span>ثالثاً: نظام اختيار المقاسات والمرونة (Flexible Size System)</span>
+                <span>رابعاً: نظام اختيار المقاسات والمرونة (Flexible Size System)</span>
               </h3>
 
               {/* Quick Standard Size Button */}
@@ -1037,12 +1256,12 @@ export default function AddProductModal({
             </div>
           </div>
 
-          {/* SECTION D: Color Variants, Direct Image Upload, Eyedropper & Per-Size Stock */}
+          {/* SECTION E: Multi-Warehouse Stocks per Color & Size */}
           <div className="space-y-6 bg-pyjama-cream/40 p-5 rounded-3xl border border-gray-100">
-            <div className="flex items-center justify-between border-b border-gray-200/80 pb-3">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-gray-200/80 pb-3">
               <h3 className="text-sm font-bold text-[#7A1C32] flex items-center gap-2">
                 <Palette className="w-4 h-4 text-[#8A2B43]" />
-                <span>رابعاً: ألوان المنتج، رفع الصور المباشر، والكميات لكل مقاس</span>
+                <span>خامساً: ألوان المنتج والمخزون المستقل للمستودعات 3 (Delivery / Store / Wholesale)</span>
               </h3>
 
               <button
@@ -1052,6 +1271,48 @@ export default function AddProductModal({
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>+ إضافة لون آخر</span>
+              </button>
+            </div>
+
+            {/* Warehouse Stock Selection Tabs */}
+            <div className="flex items-center gap-2 p-1.5 bg-white rounded-2xl border border-gray-200 w-fit">
+              <button
+                type="button"
+                onClick={() => setActiveStockTab('DELIVERY')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  activeStockTab === 'DELIVERY'
+                    ? 'bg-[#8A2B43] text-white shadow-sm'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <ShoppingBag className="w-3.5 h-3.5" />
+                <span>مخزون التوصيل (Delivery)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveStockTab('STORE')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  activeStockTab === 'STORE'
+                    ? 'bg-[#8A2B43] text-white shadow-sm'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <Store className="w-3.5 h-3.5" />
+                <span>مخزون المحل (POS Store)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setActiveStockTab('WHOLESALE')}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+                  activeStockTab === 'WHOLESALE'
+                    ? 'bg-purple-900 text-white shadow-sm'
+                    : 'text-gray-600 hover:bg-gray-100'
+                }`}
+              >
+                <Boxes className="w-3.5 h-3.5" />
+                <span>مخزون الجملة (Wholesale)</span>
               </button>
             </div>
 
@@ -1174,11 +1435,11 @@ export default function AddProductModal({
                     )}
                   </div>
 
-                  {/* Bottom: Dynamic Sizes & Stock Quantities per Color */}
+                  {/* Bottom: Dynamic Sizes & Stock Quantities for Selected Warehouse Tab */}
                   <div className="space-y-3 pt-2 border-t border-gray-100">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-gray-700">
-                        المقاسات والكميات المتوفرة للون ({colorItem.colorName || `لون ${index + 1}`}):
+                        كميات المخزون ({activeStockTab === 'DELIVERY' ? 'التوصيل' : activeStockTab === 'STORE' ? 'المحل' : 'الجملة'}) للون ({colorItem.colorName || `لون ${index + 1}`}):
                       </span>
 
                       <div className="flex items-center gap-2">
@@ -1200,67 +1461,81 @@ export default function AddProductModal({
                       </div>
                     </div>
 
-                    {/* Chips & Quantities Grid */}
-                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
-                      {generatedSizesList.map((size) => {
-                        const isActive = colorItem.activeSizes.includes(size);
-                        const qtyVal = colorItem.sizeStocks[size] ?? 10;
+                    {/* Sur Commande Notice if active */}
+                    {activeStockTab === 'WHOLESALE' && isSurCommande ? (
+                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs font-bold text-amber-900 text-center">
+                        ⚠️ خيار الطلب المسبق (Sur Commande) مفّعل: لا يلزم إدخال كميات مخزون جملة مادية.
+                      </div>
+                    ) : (
+                      /* Chips & Quantities Grid */
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+                        {generatedSizesList.map((size) => {
+                          const isActive = colorItem.activeSizes.includes(size);
+                          const targetMap =
+                            activeStockTab === 'DELIVERY'
+                              ? colorItem.deliveryStocks
+                              : activeStockTab === 'STORE'
+                              ? colorItem.storeStocks
+                              : colorItem.wholesaleStocks;
 
-                        return (
-                          <div
-                            key={`${colorItem.id}-${size}`}
-                            className={`p-2.5 rounded-2xl border transition-all flex flex-col items-center gap-1.5 ${
-                              isActive
-                                ? 'bg-pyjama-cream/80 border-[#8A2B43] shadow-sm'
-                                : 'bg-gray-50 border-gray-200 opacity-60'
-                            }`}
-                          >
-                            <button
-                              type="button"
-                              onClick={() => handleToggleColorSize(colorItem.id, size)}
-                              className={`w-full py-1 rounded-xl text-xs font-mono font-black flex items-center justify-center gap-1 transition-all ${
+                          const qtyVal = targetMap[size] ?? (activeStockTab === 'DELIVERY' ? 10 : activeStockTab === 'STORE' ? 5 : 20);
+
+                          return (
+                            <div
+                              key={`${colorItem.id}-${size}`}
+                              className={`p-2.5 rounded-2xl border transition-all flex flex-col items-center gap-1.5 ${
                                 isActive
-                                  ? 'bg-[#8A2B43] text-white shadow-xs'
-                                  : 'bg-white text-[#7A1C32] border border-gray-200'
+                                  ? 'bg-pyjama-cream/80 border-[#8A2B43] shadow-sm'
+                                  : 'bg-gray-50 border-gray-200 opacity-60'
                               }`}
                             >
-                              <span>{size}</span>
-                              {isActive && <Check className="w-3 h-3" />}
-                            </button>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleColorSize(colorItem.id, size)}
+                                className={`w-full py-1 rounded-xl text-xs font-mono font-black flex items-center justify-center gap-1 transition-all ${
+                                  isActive
+                                    ? 'bg-[#8A2B43] text-white shadow-xs'
+                                    : 'bg-white text-[#7A1C32] border border-gray-200'
+                                }`}
+                              >
+                                <span>{size}</span>
+                                {isActive && <Check className="w-3 h-3" />}
+                              </button>
 
-                            {isActive && (
-                              <div className="w-full flex items-center justify-center gap-1 mt-0.5">
-                                <span className="text-[10px] font-bold text-gray-500">الكمية:</span>
-                                <input
-                                  type="number"
-                                  min="0"
-                                  value={qtyVal}
-                                  onChange={(e) =>
-                                    handleUpdateStockQuantity(
-                                      colorItem.id,
-                                      size,
-                                      parseInt(e.target.value) || 0
-                                    )
-                                  }
-                                  className="w-12 text-center py-1 bg-white rounded-lg border border-gray-300 text-xs font-mono font-bold focus:outline-none focus:border-[#8A2B43]"
-                                />
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
+                              {isActive && (
+                                <div className="w-full flex items-center justify-center gap-1 mt-0.5">
+                                  <span className="text-[10px] font-bold text-gray-500">الكمية:</span>
+                                  <input
+                                    type="number"
+                                    min="0"
+                                    value={qtyVal}
+                                    onChange={(e) =>
+                                      handleUpdateStockQuantity(
+                                        colorItem.id,
+                                        size,
+                                        parseInt(e.target.value) || 0
+                                      )
+                                    }
+                                    className="w-12 text-center py-1 bg-white rounded-lg border border-gray-300 text-xs font-mono font-bold focus:outline-none focus:border-[#8A2B43]"
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
                 </div>
               ))}
             </div>
           </div>
 
-          {/* SECTION E: Description & Fabric Specs */}
+          {/* SECTION F: Description & Fabric Specs */}
           <div className="space-y-3 bg-pyjama-cream/40 p-5 rounded-3xl border border-gray-100">
             <h3 className="text-sm font-bold text-[#7A1C32] flex items-center gap-2 border-b border-gray-200/80 pb-3">
               <FileText className="w-4 h-4 text-[#8A2B43]" />
-              <span>خامساً: الوصف وتفاصيل القماش (Description & Notes)</span>
+              <span>سادساً: الوصف وتفاصيل القماش (Description & Notes)</span>
             </h3>
 
             <textarea

@@ -81,6 +81,7 @@ export interface ProductVariant {
   deliveryStock: number;  // مخزون التوصيل
   storeStock: number;     // مخزون المحل
   wholesaleStock: number; // مخزون الجملة
+  isSurCommande?: boolean;
 }
 
 export interface ProductColor {
@@ -108,6 +109,11 @@ export interface Product {
   sellingPrice: number;
   oldPrice?: number | null;
   wholesalePrice?: number | null;
+  superGrosPrice?: number | null;
+  unitsPerSerie?: number;
+  minWholesaleSeries?: number;
+  superGrosThreshold?: number;
+  isSurCommande?: boolean;
   description?: string;
   imageUrl?: string;
   colors?: ProductColor[];
@@ -142,7 +148,6 @@ export interface Expense {
 
 export interface Complaint {
   id: string;
-  orderId?: string;
   customerName: string;
   customerPhone: string;
   subject: string;

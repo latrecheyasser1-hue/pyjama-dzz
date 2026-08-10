@@ -297,6 +297,7 @@ export default function MasterAdminPage() {
                 deliveryStock: Number(v.delivery_stock) || 0,
                 storeStock: Number(v.store_stock) || 0,
                 wholesaleStock: Number(v.wholesale_stock) || 0,
+                isSurCommande: v.is_sur_commande ?? false,
               }))
           : [];
 
@@ -322,6 +323,11 @@ export default function MasterAdminPage() {
           sellingPrice: Number(p.selling_price) || 0,
           oldPrice: p.old_price ? Number(p.old_price) : undefined,
           wholesalePrice: p.wholesale_price ? Number(p.wholesale_price) : undefined,
+          superGrosPrice: p.super_gros_price ? Number(p.super_gros_price) : undefined,
+          unitsPerSerie: p.units_per_serie ? Number(p.units_per_serie) : 4,
+          minWholesaleSeries: p.min_wholesale_series ? Number(p.min_wholesale_series) : 1,
+          superGrosThreshold: p.super_gros_threshold ? Number(p.super_gros_threshold) : 10,
+          isSurCommande: p.is_sur_commande ?? false,
           description: p.description || undefined,
           imageUrl: p.image_url || undefined,
           colors: colors,
@@ -589,7 +595,7 @@ export default function MasterAdminPage() {
             <Menu className="w-5 h-5" />
             <span>القائمة الرئيسية</span>
           </button>
-          <span className="text-xs font-bold text-pyjama-charcoal font-mono">Pyjama DZ</span>
+          <span className="text-xs font-bold text-[#8A2B43] font-mono">Pyjama DZ</span>
         </div>
 
         {/* Section View Router */}
