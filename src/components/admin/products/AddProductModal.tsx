@@ -95,13 +95,13 @@ export default function AddProductModal({
   const [supplierPhone, setSupplierPhone] = useState('');
   const [sku, setSku] = useState('');
 
-  // Pricing State (DZD) - bulk_price mapped strictly
-  const [costPrice, setCostPrice] = useState<number | ''>('');
-  const [sellingPrice, setSellingPrice] = useState<number | ''>('');
-  const [oldPrice, setOldPrice] = useState<number | ''>('');
-  const [bulkDiscountPrice5, setBulkDiscountPrice5] = useState<number | ''>('');
-  const [wholesalePrice, setWholesalePrice] = useState<number | ''>('');
-  const [superGrosPrice, setSuperGrosPrice] = useState<number | ''>('');
+  // Pricing State (DZD) - String/Number flexible state to prevent typing resets
+  const [costPrice, setCostPrice] = useState<number | string>('');
+  const [sellingPrice, setSellingPrice] = useState<number | string>('');
+  const [oldPrice, setOldPrice] = useState<number | string>('');
+  const [bulkDiscountPrice5, setBulkDiscountPrice5] = useState<number | string>('');
+  const [wholesalePrice, setWholesalePrice] = useState<number | string>('');
+  const [superGrosPrice, setSuperGrosPrice] = useState<number | string>('');
 
   // Wholesale System Thresholds State
   const [minWholesaleSeries, setMinWholesaleSeries] = useState<number>(1);
@@ -139,6 +139,7 @@ export default function AddProductModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isEditMode = !!productToEdit;
+  const productToEditId = productToEdit?.id;
 
   // Clean Form Reset
   const resetForm = () => {
@@ -225,7 +226,7 @@ export default function AddProductModal({
     fetchData();
   }, [isOpen]);
 
-  // Pre-fill Edit Mode Data with Unified bulk_price Hydration
+  // Pre-fill Edit Mode Data ONLY ONCE when modal opens or productToEditId changes
   useEffect(() => {
     if (!isOpen) return;
 
@@ -364,7 +365,7 @@ export default function AddProductModal({
     } else {
       resetForm();
     }
-  }, [isOpen, productToEdit]);
+  }, [isOpen, productToEditId]);
 
   // Handle Supplier Selection
   const handleSupplierChange = (supId: string) => {
@@ -836,12 +837,13 @@ export default function AddProductModal({
         size_category: sizeCategory,
       };
 
+      const bVal = bulkDiscountPrice5 !== '' && !isNaN(Number(bulkDiscountPrice5)) ? Number(bulkDiscountPrice5) : null;
+
       if (activeWarehouse === 'DELIVERY' || activeWarehouse === 'STORE') {
         productPayload.supplier_name = supplierName.trim() || null;
         productPayload.supplier_phone = supplierPhone.trim() || null;
         productPayload.selling_price = Number(sellingPrice) || 0;
         productPayload.old_price = oldPrice !== '' ? Number(oldPrice) : null;
-        const bVal = bulkDiscountPrice5 !== '' ? Number(bulkDiscountPrice5) : null;
         productPayload.bulk_price = bVal;
         productPayload.bulk_discount_price_5 = bVal;
       }
@@ -897,8 +899,6 @@ export default function AddProductModal({
           });
         });
       });
-
-      const bVal = bulkDiscountPrice5 !== '' ? Number(bulkDiscountPrice5) : null;
 
       if (isEditMode && productToEdit) {
         // UPDATE existing product with resilience
@@ -1246,7 +1246,7 @@ export default function AddProductModal({
                 <input
                   type="number"
                   value={costPrice}
-                  onChange={(e) => setCostPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                  onChange={(e) => setCostPrice(e.target.value)}
                   placeholder=""
                   className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold focus:outline-none focus:border-[#8A2B43] shadow-sm"
                 />
@@ -1262,7 +1262,7 @@ export default function AddProductModal({
                     <input
                       type="number"
                       value={sellingPrice}
-                      onChange={(e) => setSellingPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                      onChange={(e) => setSellingPrice(e.target.value)}
                       placeholder=""
                       className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold text-[#8A2B43] focus:outline-none focus:border-[#8A2B43] shadow-sm"
                       required
@@ -1276,21 +1276,22 @@ export default function AddProductModal({
                     <input
                       type="number"
                       value={oldPrice}
-                      onChange={(e) => setOldPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                      onChange={(e) => setOldPrice(e.target.value)}
                       placeholder=""
                       className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold text-gray-400 focus:outline-none focus:border-[#8A2B43] shadow-sm"
                     />
                   </div>
 
-                  {/* Strictly Mapped to bulk_price */}
+                  {/* Strictly Controlled bulk_price Input */}
                   <div>
                     <label className="block text-xs font-bold text-[#8A2B43] mb-1">
                       سعر 5 حبات فما فوق
                     </label>
                     <input
                       type="number"
-                      value={bulkDiscountPrice5}
-                      onChange={(e) => setBulkDiscountPrice5(e.target.value === '' ? '' : Number(e.target.value))}
+                      name="bulk_price"
+                      value={bulkDiscountPrice5 ?? ''}
+                      onChange={(e) => setBulkDiscountPrice5(e.target.value)}
                       placeholder=""
                       className="w-full px-4 py-3 bg-white rounded-xl border border-pyjama-pink text-xs font-mono font-bold text-[#8A2B43] focus:outline-none focus:border-[#8A2B43] shadow-sm"
                     />
@@ -1308,7 +1309,7 @@ export default function AddProductModal({
                     <input
                       type="number"
                       value={wholesalePrice}
-                      onChange={(e) => setWholesalePrice(e.target.value === '' ? '' : Number(e.target.value))}
+                      onChange={(e) => setWholesalePrice(e.target.value)}
                       placeholder=""
                       className="w-full px-4 py-3 bg-white rounded-xl border border-purple-200 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-purple-800 shadow-sm"
                       required
@@ -1322,7 +1323,7 @@ export default function AddProductModal({
                     <input
                       type="number"
                       value={superGrosPrice}
-                      onChange={(e) => setSuperGrosPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                      onChange={(e) => setSuperGrosPrice(e.target.value)}
                       placeholder=""
                       className="w-full px-4 py-3 bg-white rounded-xl border border-purple-200 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-purple-800 shadow-sm"
                     />
