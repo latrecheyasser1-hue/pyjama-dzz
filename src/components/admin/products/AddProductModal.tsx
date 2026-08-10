@@ -224,7 +224,7 @@ export default function AddProductModal({
     fetchData();
   }, [isOpen]);
 
-  // Pre-fill Edit Mode Data
+  // Pre-fill Edit Mode Data with Strict Category & Field Preservation
   useEffect(() => {
     if (!isOpen) return;
 
@@ -243,6 +243,38 @@ export default function AddProductModal({
       setMinWholesaleSeries(productToEdit.minWholesaleSeries ?? 1);
       setSuperGrosThreshold(productToEdit.superGrosThreshold ?? 10);
       setDescription(productToEdit.description || '');
+
+      // Infer or load size category accurately from product data
+      let detectedCat: SizeCategoryKey =
+        (productToEdit as any).sizeCategory || (productToEdit as any).size_category || 'CLOTHING';
+
+      if (productToEdit.variants && productToEdit.variants.length > 0) {
+        const firstSize = productToEdit.variants[0].size;
+        if (SIZE_CATEGORIES.SHOES.sizes.includes(firstSize)) {
+          detectedCat = 'SHOES';
+        } else if (SIZE_CATEGORIES.LINGERIE.sizes.includes(firstSize)) {
+          detectedCat = 'LINGERIE';
+        } else if (SIZE_CATEGORIES.CLOTHING.sizes.includes(firstSize)) {
+          detectedCat = 'CLOTHING';
+        }
+      }
+      setSizeCategory(detectedCat);
+
+      const allSizesInProduct = Array.from(
+        new Set(productToEdit.variants?.map((v) => v.size) || [])
+      );
+      if (allSizesInProduct.length > 0) {
+        const catSizes = SIZE_CATEGORIES[detectedCat].sizes;
+        const validIndices = allSizesInProduct
+          .map((s) => catSizes.indexOf(s))
+          .filter((i) => i !== -1)
+          .sort((a, b) => a - b);
+
+        if (validIndices.length > 0) {
+          setMinSize(catSizes[validIndices[0]]);
+          setMaxSize(catSizes[validIndices[validIndices.length - 1]]);
+        }
+      }
 
       if (productToEdit.colors && productToEdit.colors.length > 0) {
         const colorItems: ColorInputItem[] = productToEdit.colors.map((c, idx) => {
@@ -574,12 +606,13 @@ export default function AddProductModal({
     return null;
   };
 
-  // Ultra-resilient variant insertion helper with fallback strategies for size / size_name schema cache differences
+  // Ultra-resilient variant upsert helper with fallback strategies for size / size_name schema cache differences
   const insertVariantsWithResilience = async (rows: any[]): Promise<boolean> => {
     if (rows.length === 0) return true;
 
-    // Strategy 1: Insert with size_name ONLY (matches original Supabase setup)
+    // Strategy 1: Upsert with size_name ONLY (matches original Supabase setup)
     const rowsWithSizeNameOnly = rows.map((r) => ({
+      ...(r.id ? { id: r.id } : {}),
       product_id: r.product_id,
       color_name: r.color_name,
       color_image_url: r.color_image_url,
@@ -590,11 +623,12 @@ export default function AddProductModal({
       serie_composition: r.serie_composition,
     }));
 
-    let { error: err1 } = await supabase.from('product_variants').insert(rowsWithSizeNameOnly);
+    let { error: err1 } = await supabase.from('product_variants').upsert(rowsWithSizeNameOnly);
     if (!err1) return true;
 
-    // Strategy 2: Insert with BOTH size AND size_name
+    // Strategy 2: Upsert with BOTH size AND size_name
     const rowsWithBoth = rows.map((r) => ({
+      ...(r.id ? { id: r.id } : {}),
       product_id: r.product_id,
       color_name: r.color_name,
       color_image_url: r.color_image_url,
@@ -606,11 +640,12 @@ export default function AddProductModal({
       serie_composition: r.serie_composition,
     }));
 
-    let { error: err2 } = await supabase.from('product_variants').insert(rowsWithBoth);
+    let { error: err2 } = await supabase.from('product_variants').upsert(rowsWithBoth);
     if (!err2) return true;
 
     // Strategy 3: Basic columns with size_name
     const rowsBasic = rows.map((r) => ({
+      ...(r.id ? { id: r.id } : {}),
       product_id: r.product_id,
       color_name: r.color_name,
       size_name: r.size_name || r.size,
@@ -619,10 +654,10 @@ export default function AddProductModal({
       wholesale_stock: r.wholesale_stock,
     }));
 
-    let { error: err3 } = await supabase.from('product_variants').insert(rowsBasic);
+    let { error: err3 } = await supabase.from('product_variants').upsert(rowsBasic);
     if (!err3) return true;
 
-    console.error('All variant insert attempts failed:', err3);
+    console.error('All variant upsert attempts failed:', err3);
     alert('خطأ في حفظ متغيرات المنتج: ' + (err3.message || JSON.stringify(err3)));
     return false;
   };
@@ -723,6 +758,7 @@ export default function AddProductModal({
         cost_price: Number(costPrice) || 0,
         description: description.trim() || null,
         image_url: activeColors[0]?.imageUrl || null,
+        size_category: sizeCategory,
       };
 
       if (activeWarehouse === 'DELIVERY' || activeWarehouse === 'STORE') {
@@ -730,9 +766,7 @@ export default function AddProductModal({
         productPayload.supplier_phone = supplierPhone.trim() || null;
         productPayload.selling_price = Number(sellingPrice) || 0;
         productPayload.old_price = oldPrice !== '' ? Number(oldPrice) : null;
-        if (bulkDiscountPrice5 !== '') {
-          productPayload.bulk_discount_price_5 = Number(bulkDiscountPrice5);
-        }
+        productPayload.bulk_discount_price_5 = bulkDiscountPrice5 !== '' ? Number(bulkDiscountPrice5) : null;
       }
 
       if (activeWarehouse === 'WHOLESALE') {
@@ -935,7 +969,6 @@ export default function AddProductModal({
         alert('تم إضافة المنتج بنجاح وتسجيله في جميع المستودعات! ✅');
       }
 
-      resetForm();
       onClose();
     } catch (err: any) {
       console.error('General Product Save Error:', err);
