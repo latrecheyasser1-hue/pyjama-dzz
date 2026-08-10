@@ -61,7 +61,7 @@ const sortVariantsAscending = (vars: ProductVariant[]): ProductVariant[] => {
   });
 };
 
-// Interactive Touch/Click Swipe Carousel Subcomponent for Product Thumbnail
+// Interactive Touch/Click Swipe Carousel Subcomponent for Product Thumbnail with Clean Fallbacks
 function ProductCardImageCarousel({ product }: { product: Product }) {
   const images: string[] = [];
 
@@ -85,12 +85,17 @@ function ProductCardImageCarousel({ product }: { product: Product }) {
   }
 
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [imageErrorMap, setImageErrorMap] = useState<Record<string, boolean>>({});
   const [touchStartX, setTouchStartX] = useState<number | null>(null);
 
-  if (images.length === 0) {
+  const activeSrc = images[currentIndex];
+  const isCurrentFailed = !activeSrc || imageErrorMap[activeSrc];
+
+  if (images.length === 0 || isCurrentFailed) {
     return (
-      <div className="w-20 h-20 rounded-2xl bg-pyjama-cream border border-gray-200 overflow-hidden shrink-0 flex items-center justify-center shadow-inner">
-        <Package className="w-8 h-8 text-[#8A2B43]" />
+      <div className="w-20 h-20 rounded-2xl bg-pyjama-cream border border-gray-200 overflow-hidden shrink-0 flex flex-col items-center justify-center gap-1 shadow-inner text-gray-400">
+        <Package className="w-6 h-6 text-[#8A2B43]" />
+        <span className="text-[9px] font-bold text-gray-400">بدون صورة</span>
       </div>
     );
   }
@@ -131,9 +136,13 @@ function ProductCardImageCarousel({ product }: { product: Product }) {
       onTouchEnd={handleTouchEnd}
     >
       <img
-        src={images[currentIndex]}
-        alt={product.nameAr}
+        src={activeSrc}
+        alt=""
         className="w-full h-full object-cover transition-transform duration-300 group-hover/carousel:scale-105"
+        onError={(e) => {
+          (e.target as HTMLImageElement).style.display = 'none';
+          setImageErrorMap((prev) => ({ ...prev, [activeSrc]: true }));
+        }}
       />
 
       {images.length > 1 && (

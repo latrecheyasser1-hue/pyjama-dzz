@@ -64,42 +64,54 @@ export const SIZE_CATEGORIES: Record<SizeCategoryKey, { label: string; sizes: st
   },
 };
 
-// Supabase Storage Image Binary Upload Handler (Guarantees permanent public URLs)
+// Helper to convert File to Base64 data string as an absolute fallback
+export function fileToBase64(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = (err) => reject(err);
+    reader.readAsDataURL(file);
+  });
+}
+
+// Supabase Storage Image Binary Upload Handler with Base64 Fallback
 export async function uploadImageToSupabase(file: File): Promise<string> {
-  const fileExt = file.name.split('.').pop() || 'jpg';
-  const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
-  const filePath = `products/${fileName}`;
+  try {
+    const fileExt = file.name.split('.').pop() || 'jpg';
+    const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+    const filePath = `products/${fileName}`;
 
-  // 1. Try uploading to 'product-images' bucket first, fallback to 'products'
-  let { error: uploadError } = await supabase.storage
-    .from('product-images')
-    .upload(filePath, file, { cacheControl: '3600', upsert: true });
-
-  let bucketName = 'product-images';
-
-  if (uploadError) {
-    console.warn('Fallback: Uploading to products bucket...');
-    const retry = await supabase.storage
-      .from('products')
+    // 1. Try uploading to 'product-images' bucket first, fallback to 'products'
+    let { error: uploadError } = await supabase.storage
+      .from('product-images')
       .upload(filePath, file, { cacheControl: '3600', upsert: true });
 
-    if (retry.error) {
-      console.error('Storage Upload Error:', retry.error);
-      throw retry.error;
+    let bucketName = 'product-images';
+
+    if (uploadError) {
+      console.warn('Fallback: Uploading to products bucket...');
+      const retry = await supabase.storage
+        .from('products')
+        .upload(filePath, file, { cacheControl: '3600', upsert: true });
+
+      if (!retry.error) {
+        bucketName = 'products';
+        uploadError = null;
+      }
     }
-    bucketName = 'products';
+
+    if (!uploadError) {
+      const { data } = supabase.storage.from(bucketName).getPublicUrl(filePath);
+      if (data?.publicUrl) {
+        return data.publicUrl;
+      }
+    }
+  } catch (err) {
+    console.warn('Storage upload notice (falling back to Base64 data string):', err);
   }
 
-  // 2. Get permanent Public URL
-  const { data } = supabase.storage
-    .from(bucketName)
-    .getPublicUrl(filePath);
-
-  if (!data?.publicUrl) {
-    throw new Error('فشل الحصول على الرابط العام للصورة من Supabase Storage');
-  }
-
-  return data.publicUrl;
+  // Absolute fallback: Convert file to Base64 data string so the link NEVER breaks!
+  return await fileToBase64(file);
 }
 
 interface ColorInputItem {
