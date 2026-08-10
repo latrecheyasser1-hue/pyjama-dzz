@@ -12,20 +12,26 @@ interface CategoriesManagerProps {
 }
 
 export default function CategoriesManager({
-  categories,
+  categories = [],
   products = [],
   onAddCategory,
   onDeleteCategory,
 }: CategoriesManagerProps) {
   const [name, setName] = useState('');
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
-    onAddCategory(name.trim());
-    setName('');
-    setIsFormOpen(false);
+    if (!name.trim() || isSubmitting) return;
+    setIsSubmitting(true);
+    try {
+      await onAddCategory(name.trim());
+      setName('');
+      setIsFormOpen(false);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // Helper to find automatic cover image from first product in category
@@ -50,7 +56,7 @@ export default function CategoriesManager({
 
         <button
           onClick={() => setIsFormOpen(!isFormOpen)}
-          className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-[#8A2B43] hover:bg-[#7A1C32] text-white text-xs font-bold shadow-md transition-all"
+          className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-[#8A2B43] hover:bg-[#7A1C32] text-white text-xs font-bold shadow-md transition-all shrink-0"
         >
           <Plus className="w-4 h-4" />
           <span>إضافة قسم جديد (New Category)</span>
@@ -76,6 +82,7 @@ export default function CategoriesManager({
               placeholder="مثال: بيجامات حريرية / Pyjamas Hiver / ملابس نوم"
               className="w-full px-4 py-3 rounded-xl border border-gray-200 text-xs font-bold focus:outline-none focus:border-[#8A2B43] shadow-sm"
               required
+              disabled={isSubmitting}
             />
             <p className="text-[11px] text-gray-400 mt-1">
               يمكنك كتابة الاسم بالعربية أو الفرنسية أو بشكل مختلط بحرية كاملة.
@@ -87,68 +94,91 @@ export default function CategoriesManager({
               type="button"
               onClick={() => setIsFormOpen(false)}
               className="px-4 py-2 rounded-xl border border-gray-200 text-xs font-bold text-gray-600 hover:bg-gray-50"
+              disabled={isSubmitting}
             >
               إلغاء
             </button>
             <button
               type="submit"
-              className="px-5 py-2 rounded-xl bg-[#8A2B43] text-white text-xs font-bold shadow-md hover:bg-[#7A1C32]"
+              disabled={isSubmitting}
+              className="px-5 py-2 rounded-xl bg-[#8A2B43] text-white text-xs font-bold shadow-md hover:bg-[#7A1C32] disabled:opacity-50"
             >
-              حفظ القسم في قاعدة البيانات
+              {isSubmitting ? 'جاري الحفظ...' : 'حفظ القسم في قاعدة البيانات'}
             </button>
           </div>
         </form>
       )}
 
-      {/* Categories Grid with Auto-First Product Cover Image */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-        {categories.map((cat) => {
-          const coverUrl = getCategoryCover(cat);
-          const categoryName = cat.name || cat.nameAr || cat.nameFr || 'قسم جديد';
+      {/* Empty State or Categories Grid */}
+      {categories.length === 0 ? (
+        <div className="bg-white rounded-3xl p-12 text-center border border-gray-100 shadow-card space-y-4">
+          <div className="w-16 h-16 rounded-3xl bg-pyjama-cream border border-pyjama-pink/40 text-[#8A2B43] flex items-center justify-center mx-auto shadow-sm">
+            <Grid className="w-8 h-8" />
+          </div>
+          <div className="space-y-1">
+            <h3 className="text-lg font-bold text-pyjama-charcoal">لا توجد أقسام حالياً في قاعدة البيانات</h3>
+            <p className="text-xs text-gray-500 max-w-sm mx-auto">
+              جدول الأقسام فارغ. اضغط على زر "إضافة قسم جديد" للبدء في إضافة التصنيفات.
+            </p>
+          </div>
+          <button
+            onClick={() => setIsFormOpen(true)}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-[#8A2B43] hover:bg-[#7A1C32] text-white text-xs font-bold shadow-md transition-all mt-2"
+          >
+            <Plus className="w-4 h-4" />
+            <span>إضافة قسم جديد (New Category)</span>
+          </button>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
+          {categories.map((cat) => {
+            const coverUrl = getCategoryCover(cat);
+            const categoryName = cat.name || cat.nameAr || cat.nameFr || 'قسم جديد';
 
-          return (
-            <div
-              key={cat.id}
-              className="bg-white rounded-3xl p-5 border border-gray-100 shadow-card hover:border-[#E8A5B8] transition-all flex items-center justify-between gap-4 group"
-            >
-              <div className="flex items-center gap-3.5 min-w-0">
-                {/* Automatic Cover Image Thumbnail or Theme Placeholder Badge */}
-                {coverUrl ? (
-                  <img
-                    src={coverUrl}
-                    alt={categoryName}
-                    className="w-14 h-14 rounded-2xl object-cover border border-gray-200 shadow-sm shrink-0"
-                  />
-                ) : (
-                  <div className="w-14 h-14 rounded-2xl bg-pyjama-cream border border-pyjama-pink/40 text-[#8A2B43] flex items-center justify-center font-bold shrink-0 shadow-sm">
-                    <Folder className="w-6 h-6 text-[#8A2B43]" />
-                  </div>
-                )}
-
-                <div className="min-w-0">
-                  <h4 className="text-sm font-bold text-pyjama-charcoal truncate">
-                    {categoryName}
-                  </h4>
-                  <p className="text-[11px] text-gray-400 font-mono mt-0.5 truncate">
-                    Slug: {cat.slug}
-                  </p>
-                  <span className="inline-block mt-1 text-[10px] text-[#8A2B43] font-bold bg-pyjama-pink-soft px-2 py-0.5 rounded-md">
-                    {products.filter((p) => p.categoryId === cat.id).length} منتج
-                  </span>
-                </div>
-              </div>
-
-              <button
-                onClick={() => onDeleteCategory(cat.id)}
-                className="p-2.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all shrink-0"
-                title="حذف التصنيف"
+            return (
+              <div
+                key={cat.id}
+                className="bg-white rounded-3xl p-5 border border-gray-100 shadow-card hover:border-[#E8A5B8] transition-all flex items-center justify-between gap-4 group"
               >
-                <Trash2 className="w-4 h-4" />
-              </button>
-            </div>
-          );
-        })}
-      </div>
+                <div className="flex items-center gap-3.5 min-w-0">
+                  {/* Automatic Cover Image Thumbnail or Theme Placeholder Badge */}
+                  {coverUrl ? (
+                    <img
+                      src={coverUrl}
+                      alt={categoryName}
+                      className="w-14 h-14 rounded-2xl object-cover border border-gray-200 shadow-sm shrink-0"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 rounded-2xl bg-pyjama-cream border border-pyjama-pink/40 text-[#8A2B43] flex items-center justify-center font-bold shrink-0 shadow-sm">
+                      <Folder className="w-6 h-6 text-[#8A2B43]" />
+                    </div>
+                  )}
+
+                  <div className="min-w-0">
+                    <h4 className="text-sm font-bold text-pyjama-charcoal truncate">
+                      {categoryName}
+                    </h4>
+                    <p className="text-[11px] text-gray-400 font-mono mt-0.5 truncate">
+                      Slug: {cat.slug}
+                    </p>
+                    <span className="inline-block mt-1 text-[10px] text-[#8A2B43] font-bold bg-pyjama-pink-soft px-2 py-0.5 rounded-md">
+                      {products.filter((p) => p.categoryId === cat.id).length} منتج
+                    </span>
+                  </div>
+                </div>
+
+                <button
+                  onClick={() => onDeleteCategory(cat.id)}
+                  className="p-2.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all shrink-0"
+                  title="حذف التصنيف"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

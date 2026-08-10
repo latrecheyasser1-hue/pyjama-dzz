@@ -1,11 +1,12 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { Menu } from 'lucide-react';
 import PinLockScreen from '@/components/admin/PinLockScreen';
 import PinChangeModal from '@/components/admin/PinChangeModal';
 import AdminSidebar from '@/components/admin/AdminSidebar';
 import { ToastNotificationContainer } from '@/components/admin/NotificationBanner';
+import { supabase } from '@/lib/supabaseClient';
 
 // Custom Hooks
 import { useOrderNotification } from '@/hooks/useOrderNotification';
@@ -57,12 +58,8 @@ const initialSettings: AdminSettings = {
   addressCommune: 'الشلف',
 };
 
-const initialCategories: Category[] = [
-  { id: 'cat-1', name: 'بيجامات حريرية', slug: 'pyjamas-silk' },
-  { id: 'cat-2', name: 'ملابس النوم (Nuisettes & Lingerie)', slug: 'nuisettes-lingerie' },
-  { id: 'cat-3', name: 'أحذية داخلية (Chaussons)', slug: 'chaussons' },
-  { id: 'cat-4', name: 'روب دو شامبر (Peignoirs)', slug: 'peignoirs' },
-];
+// Clean Empty Categories array ready for live Supabase synchronization
+const initialCategories: Category[] = [];
 
 const initialSuppliers: Supplier[] = [
   { id: 'sup-1', name: 'مؤسسة الأناقة للمنسوجات', phone: '+213 550 12 34 56', totalOrders: 15, outstandingBalance: 120000 },
@@ -211,6 +208,37 @@ export default function MasterAdminPage() {
   const [expenses, setExpenses] = useState<Expense[]>(initialExpenses);
   const [complaints, setComplaints] = useState<Complaint[]>(initialComplaints);
 
+  // Fetch Live Categories from Supabase
+  const fetchCategories = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .select('*')
+        .order('created_at', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching categories from Supabase:', error);
+        return;
+      }
+
+      if (data) {
+        const mapped: Category[] = data.map((item: any) => ({
+          id: String(item.id),
+          name: item.name || item.name_ar || item.name_fr || '',
+          slug: item.slug || (item.name || '').toLowerCase().trim().replace(/\s+/g, '-'),
+          coverImageUrl: item.cover_image_url || item.image_url || null,
+        }));
+        setCategories(mapped);
+      }
+    } catch (err) {
+      console.error('Failed to fetch categories:', err);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchCategories();
+  }, [fetchCategories]);
+
   // Real-time Order Notification Callback (strictly triggered ONLY by genuine Supabase DB inserts)
   const handleRealtimeNewOrder = useCallback((rawOrder: any) => {
     if (!rawOrder) return;
@@ -275,17 +303,53 @@ export default function MasterAdminPage() {
     );
   };
 
-  const handleAddCategory = (name: string) => {
-    const newCat: Category = {
-      id: `cat-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      name,
-      slug: name.toLowerCase().trim().replace(/\s+/g, '-'),
-    };
-    setCategories((prev) => [...prev, newCat]);
+  const handleAddCategory = async (name: string) => {
+    const slug = name.toLowerCase().trim().replace(/\s+/g, '-');
+    try {
+      const { data, error } = await supabase
+        .from('categories')
+        .insert([{ name, slug }])
+        .select();
+
+      if (error) {
+        console.error('Error inserting category into Supabase:', error);
+        // Fallback local insertion if DB schema varies
+        const fallbackCat: Category = {
+          id: `cat-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          name,
+          slug,
+        };
+        setCategories((prev) => [...prev, fallbackCat]);
+      } else if (data && data.length > 0) {
+        const newCat: Category = {
+          id: String(data[0].id),
+          name: data[0].name || name,
+          slug: data[0].slug || slug,
+          coverImageUrl: data[0].cover_image_url || data[0].image_url || null,
+        };
+        setCategories((prev) => [...prev, newCat]);
+      } else {
+        await fetchCategories();
+      }
+    } catch (err) {
+      console.error('Failed to add category:', err);
+    }
   };
 
-  const handleDeleteCategory = (id: string) => {
+  const handleDeleteCategory = async (id: string) => {
+    // Optimistic UI update
     setCategories((prev) => prev.filter((c) => c.id !== id));
+
+    try {
+      const { error } = await supabase.from('categories').delete().eq('id', id);
+      if (error) {
+        console.error('Error deleting category from Supabase:', error);
+        await fetchCategories();
+      }
+    } catch (err) {
+      console.error('Failed to delete category:', err);
+      await fetchCategories();
+    }
   };
 
   const handleAddSupplier = (supplier: Omit<Supplier, 'id'>) => {
