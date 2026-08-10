@@ -73,8 +73,7 @@ interface ColorInputItem {
   storeStocks: Record<string, number>;
   wholesaleStocks: Record<string, number>;
   // Wholesale Serie Composition per Color
-  serieComposition: Record<string, number>; // { S: 2, M: 2, L: 2, XL: 2 }
-  wholesaleSeriesQty: number; // Available Séries Count in Stock
+  serieComposition: Record<string, number>; // { XS: 1, S: 2, M: 2, L: 2, XL: 2 }
   activeSizes: string[];
 }
 
@@ -123,7 +122,6 @@ export default function AddProductModal({
       storeStocks: { S: 5, M: 5, L: 5, XL: 5 },
       wholesaleStocks: { S: 20, M: 20, L: 20, XL: 20 },
       serieComposition: { S: 2, M: 2, L: 2, XL: 2 },
-      wholesaleSeriesQty: 10,
       activeSizes: ['S', 'M', 'L', 'XL'],
     },
   ]);
@@ -168,7 +166,6 @@ export default function AddProductModal({
         storeStocks: { S: 5, M: 5, L: 5, XL: 5 },
         wholesaleStocks: { S: 20, M: 20, L: 20, XL: 20 },
         serieComposition: { S: 2, M: 2, L: 2, XL: 2 },
-        wholesaleSeriesQty: 10,
         activeSizes: ['S', 'M', 'L', 'XL'],
       },
     ]);
@@ -252,7 +249,6 @@ export default function AddProductModal({
           const storeStocks: Record<string, number> = {};
           const wsStocks: Record<string, number> = {};
           const serieComp: Record<string, number> = {};
-          let wsSeriesCount = 10;
 
           colorVariants.forEach((v) => {
             delStocks[v.size] = v.deliveryStock;
@@ -262,9 +258,6 @@ export default function AddProductModal({
               Object.assign(serieComp, v.serieComposition);
             } else {
               serieComp[v.size] = 2;
-            }
-            if (v.wholesaleSeriesQty !== undefined) {
-              wsSeriesCount = v.wholesaleSeriesQty;
             }
           });
 
@@ -277,7 +270,6 @@ export default function AddProductModal({
             storeStocks: storeStocks,
             wholesaleStocks: wsStocks,
             serieComposition: Object.keys(serieComp).length > 0 ? serieComp : { S: 2, M: 2, L: 2, XL: 2 },
-            wholesaleSeriesQty: wsSeriesCount,
             activeSizes: activeSizes.length > 0 ? activeSizes : ['S', 'M', 'L', 'XL'],
           };
         });
@@ -296,7 +288,6 @@ export default function AddProductModal({
           const wsStocks: Record<string, number> = {};
           const serieComp: Record<string, number> = {};
           const activeSizes: string[] = [];
-          let wsSeriesCount = 10;
 
           vars.forEach((v) => {
             activeSizes.push(v.size);
@@ -307,9 +298,6 @@ export default function AddProductModal({
               Object.assign(serieComp, v.serieComposition);
             } else {
               serieComp[v.size] = 2;
-            }
-            if (v.wholesaleSeriesQty !== undefined) {
-              wsSeriesCount = v.wholesaleSeriesQty;
             }
           });
 
@@ -322,7 +310,6 @@ export default function AddProductModal({
             storeStocks: storeStocks,
             wholesaleStocks: wsStocks,
             serieComposition: Object.keys(serieComp).length > 0 ? serieComp : { S: 2, M: 2, L: 2, XL: 2 },
-            wholesaleSeriesQty: wsSeriesCount,
             activeSizes,
           };
         });
@@ -412,7 +399,6 @@ export default function AddProductModal({
         storeStocks: initStore,
         wholesaleStocks: initWs,
         serieComposition: initSerieComp,
-        wholesaleSeriesQty: 10,
         activeSizes: [...generatedSizesList],
       },
     ]);
@@ -536,11 +522,11 @@ export default function AddProductModal({
     );
   };
 
-  // Helper to calculate total items per 1 Serie for a color
+  // STRICT FORMULA: Total Pieces Per Série = sum(selected_sizes.map(size => size.qty_per_serie))
   const getSerieTotalItems = (colorItem: ColorInputItem): number => {
     return colorItem.activeSizes.reduce((sum, size) => {
-      const count = colorItem.serieComposition[size] !== undefined ? colorItem.serieComposition[size] : 2;
-      return sum + count;
+      const count = colorItem.serieComposition[size] !== undefined ? Number(colorItem.serieComposition[size]) : 2;
+      return sum + (isNaN(count) ? 0 : count);
     }, 0);
   };
 
@@ -568,7 +554,6 @@ export default function AddProductModal({
       store_stock: r.store_stock,
       wholesale_stock: r.wholesale_stock,
       serie_composition: r.serie_composition,
-      wholesale_series_qty: r.wholesale_series_qty,
     }));
 
     let { error: err1 } = await supabase.from('product_variants').insert(fallbackRows1);
@@ -621,7 +606,6 @@ export default function AddProductModal({
     setIsSubmitting(true);
 
     try {
-      // Fetch existing DB variants if in edit mode to preserve stocks of other non-active warehouses
       let existingDbVariants: any[] = [];
       if (isEditMode && productToEdit) {
         const { data: dbVars } = await supabase
@@ -632,7 +616,6 @@ export default function AddProductModal({
         if (dbVars) existingDbVariants = dbVars;
       }
 
-      // Build Context-Isolated Base Product Payload
       const firstColorTotalItemsInSerie = activeColors[0] ? getSerieTotalItems(activeColors[0]) : 4;
 
       const productPayload: Record<string, any> = {
@@ -663,8 +646,6 @@ export default function AddProductModal({
       const generatedVariants: ProductVariant[] = [];
 
       activeColors.forEach((c) => {
-        const totalSeriePackItems = getSerieTotalItems(c);
-
         c.activeSizes.forEach((s) => {
           const existingV = existingDbVariants.find(
             (ev) =>
@@ -674,15 +655,14 @@ export default function AddProductModal({
 
           let finalDel = existingV ? Number(existingV.delivery_stock) || 0 : 10;
           let finalStore = existingV ? Number(existingV.store_stock) || 0 : 5;
-          let finalWs = existingV ? Number(existingV.wholesale_stock) || 0 : 20;
+          let finalWs = existingV ? Number(existingV.wholesale_stock) || 0 : 99;
 
           if (activeWarehouse === 'DELIVERY') {
             finalDel = c.deliveryStocks[s] !== undefined ? c.deliveryStocks[s] : 10;
           } else if (activeWarehouse === 'STORE') {
             finalStore = c.storeStocks[s] !== undefined ? c.storeStocks[s] : 5;
           } else if (activeWarehouse === 'WHOLESALE') {
-            const sizePiecesInSerie = c.serieComposition[s] !== undefined ? c.serieComposition[s] : 2;
-            finalWs = sizePiecesInSerie * c.wholesaleSeriesQty;
+            finalWs = 99;
           }
 
           generatedVariants.push({
@@ -694,7 +674,6 @@ export default function AddProductModal({
             storeStock: finalStore,
             wholesaleStock: finalWs,
             serieComposition: c.serieComposition,
-            wholesaleSeriesQty: c.wholesaleSeriesQty,
           });
         });
       });
@@ -726,7 +705,6 @@ export default function AddProductModal({
           store_stock: v.storeStock,
           wholesale_stock: v.wholesaleStock,
           serie_composition: v.serieComposition,
-          wholesale_series_qty: v.wholesaleSeriesQty,
         }));
 
         const success = await insertVariantsWithResilience(variantRows);
@@ -804,7 +782,6 @@ export default function AddProductModal({
             store_stock: v.storeStock,
             wholesale_stock: v.wholesaleStock,
             serie_composition: v.serieComposition,
-            wholesale_series_qty: v.wholesaleSeriesQty,
           }));
 
           const success = await insertVariantsWithResilience(variantRows);
@@ -1397,17 +1374,19 @@ export default function AddProductModal({
 
                     {/* Bottom: RETAIL vs DYNAMIC WHOLESALE SÉRIÉ COMPOSITION */}
                     {activeWarehouse === 'WHOLESALE' ? (
-                      /* DYNAMIC WHOLESALE SÉRIÉ COMPOSITION PER COLOR */
+                      /* DYNAMIC WHOLESALE SÉRIÉ COMPOSITION PER COLOR (EXACT FORMULA: SUM OF ACTIVE SIZE UNITS) */
                       <div className="space-y-4 pt-3 border-t border-purple-100 bg-purple-50/40 p-4 rounded-2xl">
                         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
                           <span className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
                             <Layers className="w-4 h-4 text-purple-700" />
-                            <span>تركيبة السلسلة الواحدة (Série Pack Composition) للون ({colorItem.colorName || `لون ${index + 1}`}):</span>
+                            <span>تركيبة السلسلة الواحدة (Série Composition) للون ({colorItem.colorName || `لون ${index + 1}`}):</span>
                           </span>
 
-                          {/* Auto-Calculated Total Pieces Badge */}
-                          <span className="px-3 py-1 bg-purple-900 text-white rounded-xl text-xs font-mono font-bold shadow-xs">
-                            إجمالي قطع السلسلة = {totalSerieItems} قطعة
+                          {/* EXACT AUTO-CALCULATED TOTAL SÉRIÉ PIECES BADGE */}
+                          <span className="px-3.5 py-1.5 bg-purple-900 text-white rounded-xl text-xs font-mono font-bold shadow-xs flex items-center gap-1">
+                            <span>إجمالي قطع السلسلة =</span>
+                            <span className="text-amber-300 font-black text-sm">{totalSerieItems}</span>
+                            <span>قطع</span>
                           </span>
                         </div>
 
@@ -1463,29 +1442,6 @@ export default function AddProductModal({
                               </div>
                             );
                           })}
-                        </div>
-
-                        {/* Available Séries Stock Input */}
-                        <div className="pt-2 border-t border-purple-200/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-                          <label className="text-xs font-bold text-purple-900">
-                            عدد السلاسل المتوفرة في المخزون (Available Séries Qty):
-                          </label>
-                          <div className="flex items-center gap-2 w-full sm:w-auto">
-                            <input
-                              type="number"
-                              min="0"
-                              value={colorItem.wholesaleSeriesQty}
-                              onChange={(e) =>
-                                handleUpdateColor(
-                                  colorItem.id,
-                                  'wholesaleSeriesQty',
-                                  Math.max(0, parseInt(e.target.value) || 0)
-                                )
-                              }
-                              className="w-24 px-3 py-1.5 bg-white rounded-xl border border-purple-300 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-purple-800 text-center"
-                            />
-                            <span className="text-xs font-bold text-purple-800">سلسلة (Séries)</span>
-                          </div>
                         </div>
                       </div>
                     ) : (
