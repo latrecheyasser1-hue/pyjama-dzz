@@ -701,7 +701,7 @@ export default function AddProductModal({
     return updated;
   };
 
-  // Resilient variant upsert helper (Sanitizes integer vs string IDs and guarantees color_image_url persistence)
+  // Resilient variant upsert helper (Sanitizes IDs and fallbacks across schema variations)
   const insertVariantsWithResilience = async (rows: any[]): Promise<boolean> => {
     if (rows.length === 0) return true;
 
@@ -744,8 +744,34 @@ export default function AddProductModal({
     let { error: err2 } = await supabase.from('product_variants').insert(rowsNoId);
     if (!err2) return true;
 
-    console.error('All variant insert attempts failed:', err2);
-    alert('خطأ في حفظ متغيرات المنتج: ' + (err2.message || JSON.stringify(err2)));
+    console.warn('Strategy 2 notice, trying fallback without color_image_url column:', err2?.message || err2);
+
+    // Strategy 3: Try without color_image_url in case DB schema lacks color_image_url column
+    const rowsNoColorImg = rowsNoId.map((r) => {
+      const { color_image_url, ...rest } = r;
+      return rest;
+    });
+
+    let { error: err3 } = await supabase.from('product_variants').insert(rowsNoColorImg);
+    if (!err3) return true;
+
+    console.warn('Strategy 3 notice, trying fallback without serie_composition:', err3?.message || err3);
+
+    // Strategy 4: Standard core fields ONLY (product_id, color_name, size_name, stocks)
+    const rowsBasic = rowsNoId.map((r) => ({
+      product_id: r.product_id,
+      color_name: r.color_name || r.color,
+      size_name: r.size_name || r.size,
+      delivery_stock: Number(r.delivery_stock) || 0,
+      store_stock: Number(r.store_stock) || 0,
+      wholesale_stock: Number(r.wholesale_stock) || 0,
+    }));
+
+    let { error: err4 } = await supabase.from('product_variants').insert(rowsBasic);
+    if (!err4) return true;
+
+    console.error('All variant insert attempts failed:', err4);
+    alert('خطأ في حفظ متغيرات المنتج: ' + (err4.message || JSON.stringify(err4)));
     return false;
   };
 
