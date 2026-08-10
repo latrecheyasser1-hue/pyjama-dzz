@@ -60,11 +60,7 @@ const initialSettings: AdminSettings = {
 
 // Clean Categories array ready for live Supabase synchronization
 const initialCategories: Category[] = [];
-
-const initialSuppliers: Supplier[] = [
-  { id: 'sup-1', name: 'مؤسسة الأناقة للمنسوجات', phone: '+213 550 12 34 56', totalOrders: 15, outstandingBalance: 120000 },
-  { id: 'sup-2', name: 'ورشة البهجة للبيجاما', phone: '+213 661 98 76 54', totalOrders: 8, outstandingBalance: 45000 },
-];
+const initialSuppliers: Supplier[] = [];
 
 const initialCustomers: Customer[] = [
   {
@@ -237,9 +233,39 @@ export default function MasterAdminPage() {
     }
   }, []);
 
+  // Fetch Live Suppliers from Supabase
+  const fetchSuppliers = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('suppliers')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.warn('Supabase suppliers select notice:', error.message || error);
+        return;
+      }
+
+      if (data) {
+        const mapped: Supplier[] = data.map((item: any) => ({
+          id: String(item.id),
+          name: item.name || item.supplier_name || '',
+          phone: item.phone || item.supplier_phone || '',
+          totalOrders: 0,
+          outstandingBalance: 0,
+          createdAt: item.created_at,
+        }));
+        setSuppliers(mapped);
+      }
+    } catch (err: any) {
+      console.warn('Failed to fetch suppliers from Supabase:', err?.message || err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchCategories();
-  }, [fetchCategories]);
+    fetchSuppliers();
+  }, [fetchCategories, fetchSuppliers]);
 
   // Real-time Order Notification Callback (strictly triggered ONLY by genuine Supabase DB inserts)
   const handleRealtimeNewOrder = useCallback((rawOrder: any) => {
@@ -326,7 +352,7 @@ export default function MasterAdminPage() {
       }
 
       console.log('Category saved successfully:', data);
-      await fetchCategories(); // Synchronously re-fetch from DB
+      await fetchCategories();
       return true;
     } catch (err: any) {
       console.error('Failed to insert category into Supabase:', err);
@@ -344,7 +370,7 @@ export default function MasterAdminPage() {
         alert('خطأ في الحذف من قاعدة البيانات: ' + (error.message || JSON.stringify(error)));
         return false;
       }
-      await fetchCategories(); // Synchronously re-fetch from DB
+      await fetchCategories();
       return true;
     } catch (err: any) {
       console.error('Failed to delete category from Supabase:', err);
@@ -353,12 +379,48 @@ export default function MasterAdminPage() {
     }
   };
 
-  const handleAddSupplier = (supplier: Omit<Supplier, 'id'>) => {
-    const newSup: Supplier = {
-      ...supplier,
-      id: `sup-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-    };
-    setSuppliers((prev) => [...prev, newSup]);
+  // Synchronous Supabase Supplier Add
+  const handleAddSupplier = async (supplier: { name: string; phone: string }): Promise<boolean> => {
+    if (!supplier.name.trim() || !supplier.phone.trim()) return false;
+
+    try {
+      const { data, error } = await supabase
+        .from('suppliers')
+        .insert([{ name: supplier.name.trim(), phone: supplier.phone.trim() }])
+        .select();
+
+      if (error) {
+        console.error('Supabase Supplier Insert Error:', error);
+        alert('خطأ في حفظ المورد في قاعدة البيانات: ' + (error.message || JSON.stringify(error)));
+        return false;
+      }
+
+      console.log('Supplier saved successfully:', data);
+      await fetchSuppliers();
+      return true;
+    } catch (err: any) {
+      console.error('Failed to insert supplier into Supabase:', err);
+      alert('خطأ في حفظ المورد: ' + (err?.message || String(err)));
+      return false;
+    }
+  };
+
+  // Synchronous Supabase Supplier Delete
+  const handleDeleteSupplier = async (id: string): Promise<boolean> => {
+    try {
+      const { error } = await supabase.from('suppliers').delete().eq('id', id);
+      if (error) {
+        console.error('Supabase Supplier Delete Error:', error);
+        alert('خطأ في حذف المورد من قاعدة البيانات: ' + (error.message || JSON.stringify(error)));
+        return false;
+      }
+      await fetchSuppliers();
+      return true;
+    } catch (err: any) {
+      console.error('Failed to delete supplier from Supabase:', err);
+      alert('خطأ في حذف المورد: ' + (err?.message || String(err)));
+      return false;
+    }
   };
 
   const handleUpdateComplaintStatus = (id: string, newStatus: ComplaintStatus) => {
@@ -432,7 +494,7 @@ export default function MasterAdminPage() {
           <span className="text-xs font-bold text-pyjama-charcoal font-mono">Pyjama DZ</span>
         </div>
 
-        {/* Section View Router (Each module component renders strictly ONE clean header card) */}
+        {/* Section View Router */}
         {activeSection === 'NEW_ORDERS' && (
           <NewOrdersTicker
             orders={orders}
@@ -463,6 +525,7 @@ export default function MasterAdminPage() {
           <SuppliersManager
             suppliers={suppliers}
             onAddSupplier={handleAddSupplier}
+            onDeleteSupplier={handleDeleteSupplier}
           />
         )}
 
