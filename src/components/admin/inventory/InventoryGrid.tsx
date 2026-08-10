@@ -455,13 +455,18 @@ export default function InventoryGrid({
                                 )}
                               </div>
                             ) : (
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-2 flex-wrap">
                                 <span className="text-sm font-black text-[#8A2B43] font-mono">
                                   {product.sellingPrice || 0} د.ج
                                 </span>
                                 {product.oldPrice && (
                                   <span className="text-xs text-gray-400 line-through font-mono">
                                     {product.oldPrice} د.ج
+                                  </span>
+                                )}
+                                {(product.bulk_price || product.bulkPrice || product.bulkDiscountPrice5) && (
+                                  <span className="text-[10px] font-bold text-[#8A2B43] font-mono bg-pyjama-pink-soft px-2 py-0.5 rounded-md border border-pyjama-pink/40" title="سعر 5 حبات فما فوق">
+                                    5+ حبات: {product.bulk_price || product.bulkPrice || product.bulkDiscountPrice5} د.ج
                                   </span>
                                 )}
                               </div>
