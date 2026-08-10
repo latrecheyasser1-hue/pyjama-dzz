@@ -14,7 +14,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
-import { Product, StockType, Category } from '@/types/admin';
+import { Product, StockType, Category, ProductVariant } from '@/types/admin';
 
 interface InventoryGridProps {
   products: Product[];
@@ -25,6 +25,41 @@ interface InventoryGridProps {
   onEditProduct?: (product: Product) => void;
   reFetchProducts?: () => Promise<void>;
 }
+
+// Letter Size Hierarchy Map for Ascending Sorting
+const SIZE_LETTER_MAP: Record<string, number> = {
+  '3XS': 1,
+  '2XS': 2,
+  'XS': 3,
+  'S': 4,
+  'M': 5,
+  'L': 6,
+  'XL': 7,
+  '2XL': 8,
+  'XXL': 8,
+  '3XL': 9,
+  'XXXL': 9,
+  '4XL': 10,
+  '5XL': 11,
+  '6XL': 12,
+};
+
+// Helper: Sort Variants in Strict Ascending Size Order (from smallest to largest)
+const sortVariantsAscending = (vars: ProductVariant[]): ProductVariant[] => {
+  return [...vars].sort((a, b) => {
+    const sizeA = (a.size || '').trim();
+    const sizeB = (b.size || '').trim();
+
+    const rankA = SIZE_LETTER_MAP[sizeA.toUpperCase()];
+    const rankB = SIZE_LETTER_MAP[sizeB.toUpperCase()];
+
+    if (rankA !== undefined && rankB !== undefined) {
+      return rankA - rankB;
+    }
+
+    return sizeA.localeCompare(sizeB, undefined, { numeric: true, sensitivity: 'base' });
+  });
+};
 
 // Color Hex Resolver Helper
 const getColorHex = (colorName: string, variant: any): string => {
@@ -439,6 +474,7 @@ export default function InventoryGrid({
                       <div className="space-y-3 pt-3 border-t border-gray-100">
                         {Object.entries(groupedColors).map(([colorName, colorVars]) => {
                           const hexColorVal = getColorHex(colorName, colorVars?.[0]);
+                          const sortedColorVars = sortVariantsAscending(colorVars);
 
                           return (
                             <div
@@ -459,9 +495,9 @@ export default function InventoryGrid({
                                 </div>
                               </div>
 
-                              {/* Size Stock Chips with Interactive [+] / [-] Quick Action Buttons */}
+                              {/* Size Stock Chips Sorted Strictly Ascending (من الأصغر للأكبر) */}
                               <div className="flex flex-wrap gap-1.5">
-                                {colorVars.map((v) => {
+                                {sortedColorVars.map((v) => {
                                   const stockQty =
                                     activeStockTab === 'DELIVERY'
                                       ? v.deliveryStock
