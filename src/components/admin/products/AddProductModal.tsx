@@ -14,7 +14,6 @@ import {
   FileText,
   Truck,
   Phone,
-  Image as ImageIcon,
   CheckCircle,
   Sparkles,
   Zap,
@@ -23,13 +22,14 @@ import {
   Check,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
-import { Category, Product, ProductColor, ProductVariant, Supplier } from '@/types/admin';
+import { Category, Product, ProductVariant, Supplier } from '@/types/admin';
 
 interface AddProductModalProps {
   isOpen: boolean;
   onClose: () => void;
   onProductAdded: (newProduct: Product) => void;
   onProductUpdated?: (updatedProduct: Product) => void;
+  reFetchProducts?: () => Promise<void>;
   productToEdit?: Product | null;
 }
 
@@ -74,6 +74,7 @@ export default function AddProductModal({
   onClose,
   onProductAdded,
   onProductUpdated,
+  reFetchProducts,
   productToEdit,
 }: AddProductModalProps) {
   // Basic Info Form State
@@ -215,7 +216,6 @@ export default function AddProductModal({
       setWholesalePrice(productToEdit.wholesalePrice ?? '');
       setDescription(productToEdit.description || '');
 
-      // Reconstruct color variants
       if (productToEdit.colors && productToEdit.colors.length > 0) {
         const colorItems: ColorInputItem[] = productToEdit.colors.map((c, idx) => {
           const colorName = c.colorName;
@@ -442,7 +442,6 @@ export default function AddProductModal({
     );
   };
 
-  // Calculate discount percentage
   const calculateDiscountPercentage = (): number | null => {
     if (oldPrice && sellingPrice && Number(oldPrice) > Number(sellingPrice)) {
       const discount = ((Number(oldPrice) - Number(sellingPrice)) / Number(oldPrice)) * 100;
@@ -451,6 +450,7 @@ export default function AddProductModal({
     return null;
   };
 
+  // Synchronous Supabase Insert/Update with Explicit Error alerts & toasts
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -510,32 +510,20 @@ export default function AddProductModal({
 
       if (isEditMode && productToEdit) {
         // UPDATE existing product
-        const { error: updateErr } = await supabase
+        const { error: productError } = await supabase
           .from('products')
           .update(productPayload)
           .eq('id', productToEdit.id);
 
-        if (updateErr) {
-          console.warn('Supabase product update notice:', updateErr.message || updateErr);
+        if (productError) {
+          console.error('Products Update Error:', productError);
+          alert('خطأ في حفظ وتعديل المنتج في قاعدة البيانات: ' + (productError.message || JSON.stringify(productError)));
+          setIsSubmitting(false);
+          return;
         }
 
-        // Clean & Re-insert child tables
-        await supabase.from('product_colors').delete().eq('product_id', productToEdit.id);
-        await supabase.from('product_sizes').delete().eq('product_id', productToEdit.id);
+        // Clean & Re-insert variants
         await supabase.from('product_variants').delete().eq('product_id', productToEdit.id);
-
-        const colorRows = activeColors.map((c) => ({
-          product_id: productToEdit.id,
-          color_name: c.colorName.trim(),
-          image_url: c.imageUrl.trim() || null,
-        }));
-        await supabase.from('product_colors').insert(colorRows);
-
-        const sizeRows = generatedSizesList.map((s) => ({
-          product_id: productToEdit.id,
-          size_name: s,
-        }));
-        await supabase.from('product_sizes').insert(sizeRows);
 
         const variantRows: any[] = [];
         activeColors.forEach((c) => {
@@ -544,6 +532,8 @@ export default function AddProductModal({
             variantRows.push({
               product_id: productToEdit.id,
               color_name: c.colorName.trim(),
+              color_image_url: c.imageUrl.trim() || null,
+              size: s,
               size_name: s,
               delivery_stock: stockVal,
               store_stock: stockVal,
@@ -553,7 +543,16 @@ export default function AddProductModal({
         });
 
         if (variantRows.length > 0) {
-          await supabase.from('product_variants').insert(variantRows);
+          const { error: variantError } = await supabase
+            .from('product_variants')
+            .insert(variantRows);
+
+          if (variantError) {
+            console.error('Variants Update Insert Error:', variantError);
+            alert('خطأ في حفظ متغيرات المنتج: ' + (variantError.message || JSON.stringify(variantError)));
+            setIsSubmitting(false);
+            return;
+          }
         }
 
         const updatedProdObj: Product = {
@@ -580,29 +579,30 @@ export default function AddProductModal({
         } else {
           onProductAdded(updatedProdObj);
         }
+
+        if (reFetchProducts) {
+          await reFetchProducts();
+        }
+
+        alert('تم تعديل وحفظ المنتج بنجاح في قاعدة البيانات! ✅');
       } else {
         // INSERT new product
         let insertedProductId = `prod-${Date.now()}`;
-        const { data: prodData, error: prodError } = await supabase
+        const { data: prodData, error: productError } = await supabase
           .from('products')
           .insert([productPayload])
-          .select();
+          .select()
+          .single();
 
-        if (!prodError && prodData && prodData.length > 0) {
-          insertedProductId = String(prodData[0].id);
+        if (productError) {
+          console.error('Products Insert Error:', productError);
+          alert('خطأ في حفظ المنتج في قاعدة البيانات: ' + (productError.message || JSON.stringify(productError)));
+          setIsSubmitting(false);
+          return;
+        }
 
-          const colorRows = activeColors.map((c) => ({
-            product_id: insertedProductId,
-            color_name: c.colorName.trim(),
-            image_url: c.imageUrl.trim() || null,
-          }));
-          await supabase.from('product_colors').insert(colorRows);
-
-          const sizeRows = generatedSizesList.map((s) => ({
-            product_id: insertedProductId,
-            size_name: s,
-          }));
-          await supabase.from('product_sizes').insert(sizeRows);
+        if (prodData) {
+          insertedProductId = String(prodData.id);
 
           const variantRows: any[] = [];
           activeColors.forEach((c) => {
@@ -611,6 +611,8 @@ export default function AddProductModal({
               variantRows.push({
                 product_id: insertedProductId,
                 color_name: c.colorName.trim(),
+                color_image_url: c.imageUrl.trim() || null,
+                size: s,
                 size_name: s,
                 delivery_stock: stockVal,
                 store_stock: stockVal,
@@ -620,7 +622,16 @@ export default function AddProductModal({
           });
 
           if (variantRows.length > 0) {
-            await supabase.from('product_variants').insert(variantRows);
+            const { error: variantError } = await supabase
+              .from('product_variants')
+              .insert(variantRows);
+
+            if (variantError) {
+              console.error('Variants Insert Error:', variantError);
+              alert('خطأ في حفظ متغيرات المنتج: ' + (variantError.message || JSON.stringify(variantError)));
+              setIsSubmitting(false);
+              return;
+            }
           }
         }
 
@@ -644,13 +655,19 @@ export default function AddProductModal({
         };
 
         onProductAdded(newProduct);
+
+        if (reFetchProducts) {
+          await reFetchProducts();
+        }
+
+        alert('تم حفظ المنتج بنجاح في قاعدة البيانات! ✅');
       }
 
       resetForm();
       onClose();
     } catch (err: any) {
-      console.error('Error saving product:', err);
-      alert('حدث خطأ أثناء حفظ المنتج: ' + (err?.message || String(err)));
+      console.error('General Product Save Error:', err);
+      alert('خطأ عام أثناء حفظ المنتج: ' + (err?.message || String(err)));
     } finally {
       setIsSubmitting(false);
     }
@@ -659,7 +676,6 @@ export default function AddProductModal({
   if (!isOpen) return null;
 
   const discountPercent = calculateDiscountPercentage();
-  const currentCategorySizes = SIZE_CATEGORIES[sizeCategory].sizes;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm dir-rtl" dir="rtl">
@@ -724,10 +740,9 @@ export default function AddProductModal({
                   onChange={(e) => setCategoryId(e.target.value)}
                   className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-bold focus:outline-none focus:border-[#8A2B43] shadow-sm"
                 >
+                  <option value="">-- اختر القسم من القائمة --</option>
                   {isLoadingCategories ? (
                     <option value="">جاري تحميل الأقسام...</option>
-                  ) : categories.length === 0 ? (
-                    <option value="">لا توجد أقسام متاحة</option>
                   ) : (
                     categories.map((cat) => (
                       <option key={cat.id} value={cat.id}>
@@ -945,7 +960,7 @@ export default function AddProductModal({
                       onChange={(e) => setMinSize(e.target.value)}
                       className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold focus:outline-none focus:border-[#8A2B43] shadow-sm"
                     >
-                      {currentCategorySizes.map((s) => (
+                      {SIZE_CATEGORIES[sizeCategory].sizes.map((s) => (
                         <option key={`min-${s}`} value={s}>
                           {s}
                         </option>
@@ -963,7 +978,7 @@ export default function AddProductModal({
                       onChange={(e) => setMaxSize(e.target.value)}
                       className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold focus:outline-none focus:border-[#8A2B43] shadow-sm"
                     >
-                      {currentCategorySizes.map((s) => (
+                      {SIZE_CATEGORIES[sizeCategory].sizes.map((s) => (
                         <option key={`max-${s}`} value={s}>
                           {s}
                         </option>

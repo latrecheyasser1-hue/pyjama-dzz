@@ -262,10 +262,85 @@ export default function MasterAdminPage() {
     }
   }, []);
 
+  // Fetch Live Products from Supabase
+  const fetchProducts = useCallback(async () => {
+    try {
+      const { data: prodData, error: prodError } = await supabase
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (prodError) {
+        console.warn('Supabase products select notice:', prodError.message || prodError);
+        return;
+      }
+
+      if (!prodData || prodData.length === 0) {
+        return;
+      }
+
+      const prodIds = prodData.map((p: any) => p.id);
+      const { data: varData } = await supabase
+        .from('product_variants')
+        .select('*')
+        .in('product_id', prodIds);
+
+      const mappedProducts: Product[] = prodData.map((p: any) => {
+        const pVariants = varData
+          ? varData
+              .filter((v: any) => String(v.product_id) === String(p.id))
+              .map((v: any) => ({
+                id: String(v.id),
+                productId: String(v.product_id),
+                size: v.size || v.size_name || 'Standard',
+                color: v.color_name || v.color || 'أساسي',
+                deliveryStock: Number(v.delivery_stock) || 0,
+                storeStock: Number(v.store_stock) || 0,
+                wholesaleStock: Number(v.wholesale_stock) || 0,
+              }))
+          : [];
+
+        const colorsSet = new Set<string>();
+        pVariants.forEach((v) => colorsSet.add(v.color));
+        const colors = Array.from(colorsSet).map((cName) => ({
+          colorName: cName,
+          imageUrl: p.image_url || undefined,
+        }));
+
+        const sizesSet = new Set<string>();
+        pVariants.forEach((v) => sizesSet.add(v.size));
+        const sizes = Array.from(sizesSet);
+
+        return {
+          id: String(p.id),
+          sku: p.sku || `PYJ-${String(p.id).substring(0, 6)}`,
+          nameAr: p.name || p.title || p.name_ar || 'منتج جديد',
+          categoryId: p.category_id ? String(p.category_id) : undefined,
+          supplierName: p.supplier_name || undefined,
+          supplierPhone: p.supplier_phone || undefined,
+          costPrice: Number(p.cost_price) || 0,
+          sellingPrice: Number(p.selling_price) || 0,
+          oldPrice: p.old_price ? Number(p.old_price) : undefined,
+          wholesalePrice: p.wholesale_price ? Number(p.wholesale_price) : undefined,
+          description: p.description || undefined,
+          imageUrl: p.image_url || undefined,
+          colors: colors,
+          sizes: sizes,
+          variants: pVariants,
+        };
+      });
+
+      setProducts(mappedProducts);
+    } catch (err: any) {
+      console.warn('Failed to fetch products from Supabase:', err?.message || err);
+    }
+  }, []);
+
   useEffect(() => {
     fetchCategories();
     fetchSuppliers();
-  }, [fetchCategories, fetchSuppliers]);
+    fetchProducts();
+  }, [fetchCategories, fetchSuppliers, fetchProducts]);
 
   // Real-time Order Notification Callback (strictly triggered ONLY by genuine Supabase DB inserts)
   const handleRealtimeNewOrder = useCallback((rawOrder: any) => {
@@ -535,6 +610,7 @@ export default function MasterAdminPage() {
             onAddProduct={handleAddProduct}
             onUpdateProduct={handleUpdateProduct}
             onDeleteProduct={handleDeleteProduct}
+            reFetchProducts={fetchProducts}
           />
         )}
 

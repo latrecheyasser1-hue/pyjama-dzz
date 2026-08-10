@@ -14,6 +14,7 @@ interface InventoryManagerProps {
   onAddProduct?: (newProduct: Product) => void;
   onDeleteProduct?: (productId: string) => void;
   onUpdateProduct?: (updatedProduct: Product) => void;
+  reFetchProducts?: () => Promise<void>;
 }
 
 export default function InventoryManager({
@@ -24,6 +25,7 @@ export default function InventoryManager({
   onAddProduct,
   onDeleteProduct,
   onUpdateProduct,
+  reFetchProducts,
 }: InventoryManagerProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -80,7 +82,7 @@ export default function InventoryManager({
             {getDynamicTitle(activeStockTab)}
           </h2>
           <p className="text-xs text-gray-500 font-medium">
-            انقر على أي قسم لاستعراض كروت المنتجات وتعديل مخزونها مباشرة
+            متابعة دقيقة بكميات المخزون والمقاسات والألوان حسب الأقسام
           </p>
         </div>
 
@@ -125,6 +127,7 @@ export default function InventoryManager({
         onClose={() => setIsAddModalOpen(false)}
         onProductAdded={handleProductCreated}
         onProductUpdated={handleProductUpdated}
+        reFetchProducts={reFetchProducts}
         productToEdit={productToEdit}
       />
     </div>
