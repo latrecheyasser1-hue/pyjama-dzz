@@ -36,6 +36,11 @@ export function useOrderNotification(onNewOrderReceived?: (newOrderData: any) =>
     });
   }, []);
 
+  // Pure sound test function: strictly plays audio without altering orders state
+  const playTestSound = useCallback(() => {
+    playNewOrderChime();
+  }, []);
+
   const triggerNewOrderAlert = useCallback(
     (orderData?: any) => {
       // Play sound chime if sound is enabled
@@ -48,10 +53,10 @@ export function useOrderNotification(onNewOrderReceived?: (newOrderData: any) =>
       const newToast: ToastAlert = {
         id: uniqueId,
         title: '📦 طلبية جديدة واردة الآن!',
-        message: orderData?.customerName
-          ? `طلب جديد باسم ${orderData.customerName} بقيمة ${orderData.totalAmountDzd || ''} DZD`
+        message: orderData?.customer_name || orderData?.customerName
+          ? `طلب جديد باسم ${orderData.customer_name || orderData.customerName} بقيمة ${orderData.total_amount_dzd || orderData.totalAmountDzd || ''} DZD`
           : 'وصلتك طلبية جديدة في الانتظار',
-        orderId: orderData?.formattedId,
+        orderId: orderData?.formatted_id || orderData?.formattedId,
         createdAt: new Date().toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit' }),
       };
 
@@ -62,7 +67,7 @@ export function useOrderNotification(onNewOrderReceived?: (newOrderData: any) =>
         setToastAlerts((prev) => prev.filter((t) => t.id !== newToast.id));
       }, 5000);
 
-      // Invoke callback to update orders state in app
+      // Invoke callback ONLY for genuine realtime database updates
       if (onNewOrderReceived) {
         onNewOrderReceived(orderData);
       }
@@ -74,7 +79,7 @@ export function useOrderNotification(onNewOrderReceived?: (newOrderData: any) =>
     setToastAlerts((prev) => prev.filter((t) => t.id !== id));
   }, []);
 
-  // Supabase Realtime Subscription
+  // Supabase Realtime Subscription: ONLY genuine DB inserts trigger state updates
   useEffect(() => {
     const channel = supabase
       .channel('public:orders')
@@ -122,6 +127,7 @@ export function useOrderNotification(onNewOrderReceived?: (newOrderData: any) =>
   return {
     isMuted,
     toggleSound,
+    playTestSound,
     toastAlerts,
     dismissToast,
     triggerNewOrderAlert,

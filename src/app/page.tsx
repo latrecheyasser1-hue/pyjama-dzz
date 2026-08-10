@@ -238,7 +238,7 @@ export default function MasterAdminPage() {
   const [expenses, setExpenses] = useState<Expense[]>(initialExpenses);
   const [complaints, setComplaints] = useState<Complaint[]>(initialComplaints);
 
-  // Real-time Order Notification Callback
+  // Real-time Order Notification Callback (strictly triggered ONLY by genuine Supabase DB inserts)
   const handleRealtimeNewOrder = useCallback((rawOrder: any) => {
     if (!rawOrder) return;
     const uniqueId = rawOrder.id || `ord-rt-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
@@ -268,35 +268,14 @@ export default function MasterAdminPage() {
   const {
     isMuted,
     toggleSound,
+    playTestSound,
     toastAlerts,
     dismissToast,
-    triggerNewOrderAlert,
   } = useOrderNotification(handleRealtimeNewOrder);
 
-  // Manual Test Sound Alert Trigger
+  // Pure Test Audio Notification Trigger (Strictly plays sound only - NO state mutations or mock orders)
   const handleTestSoundAlert = () => {
-    const uniqueId = `ord-test-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
-    const mockOrder: DetailedOrder = {
-      id: uniqueId,
-      sequentialId: orders.length + 1,
-      formattedId: String(orders.length + 1).padStart(2, '0'),
-      orderType: Math.random() > 0.5 ? 'RETAIL' : 'WHOLESALE',
-      customerName: 'مريم الزهراء',
-      customerPhone: '+213 554 99 88 77',
-      wilaya: 'الشلف',
-      commune: 'الشلف',
-      deliveryType: 'HOME',
-      totalAmountDzd: 7800,
-      items: [
-        { id: `item-${Date.now()}`, productName: 'طقم بيجاما حرير راقي', sku: 'PYJ-TEST', size: 'L', color: 'Burgundy', quantity: 1, unitPrice: 7800 },
-      ],
-      totalQuantity: 1,
-      status: 'UNCONFIRMED',
-      createdAt: new Date().toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit' }),
-    };
-
-    triggerNewOrderAlert(mockOrder);
-    setOrders((prev) => [mockOrder, ...prev]);
+    playTestSound();
   };
 
   // Unconfirmed Orders Count
