@@ -628,8 +628,8 @@ export default function InventoryGrid({
                                 </div>
                               </div>
 
-                              {/* Size Stock Chips Sorted Strictly Ascending (من الأصغر للأكبر) */}
-                              <div className="flex flex-wrap gap-2">
+                              {/* 2-Column Side-by-Side Size Grid (Left-to-Right Flow) */}
+                              <div className="grid grid-cols-2 gap-2 dir-ltr" dir="ltr">
                                 {sortedColorVars.map((v) => {
                                   const stockQty =
                                     activeStockTab === 'DELIVERY'
@@ -641,48 +641,49 @@ export default function InventoryGrid({
                                   return (
                                     <div
                                       key={v.id}
-                                      className={`px-2.5 py-1.5 rounded-2xl text-xs font-mono font-bold border flex items-center gap-2 transition-all shadow-xs ${
+                                      className={`px-2 py-1.5 rounded-2xl text-xs font-mono font-bold border flex items-center justify-between transition-all shadow-xs ${
                                         stockQty > 0
-                                          ? 'bg-white text-gray-900 border-gray-300'
+                                          ? 'bg-white text-gray-900 border-gray-300 hover:border-[#8A2B43]/50'
                                           : 'bg-rose-50/80 text-rose-700 border-rose-200 opacity-90'
                                       }`}
                                     >
                                       {/* Size Label Badge */}
-                                      <span className="px-2 py-0.5 rounded-lg bg-gray-100 text-gray-900 font-extrabold text-xs border border-gray-200/80 shrink-0">
+                                      <span className="px-1.5 py-0.5 rounded-lg bg-gray-100 text-gray-900 font-extrabold text-xs border border-gray-200/80 shrink-0">
                                         {v.size}
                                       </span>
 
-                                      <span className="w-px h-3.5 bg-gray-200 shrink-0" />
+                                      {/* Stock Modifier Buttons & Quantity Display */}
+                                      <div className="flex items-center gap-1 shrink-0">
+                                        {/* Decrease Stock Button */}
+                                        <button
+                                          type="button"
+                                          onClick={(e) => handleStockChange(v.id, stockQty, -1, e)}
+                                          className="w-5 h-5 rounded-lg bg-gray-100 hover:bg-[#8A2B43] hover:text-white text-gray-800 font-black flex items-center justify-center text-xs transition-all shrink-0 active:scale-95 border border-gray-200/80"
+                                          title="إنقاص الكمية -1"
+                                        >
+                                          -
+                                        </button>
 
-                                      {/* Decrease Stock Button */}
-                                      <button
-                                        type="button"
-                                        onClick={(e) => handleStockChange(v.id, stockQty, -1, e)}
-                                        className="w-5 h-5 rounded-lg bg-gray-100 hover:bg-[#8A2B43] hover:text-white text-gray-800 font-black flex items-center justify-center text-xs transition-all shrink-0 active:scale-95 border border-gray-200/80"
-                                        title="إنقاص الكمية -1"
-                                      >
-                                        -
-                                      </button>
+                                        <span
+                                          className={
+                                            stockQty > 0
+                                              ? 'text-[#8A2B43] font-black text-xs min-w-[14px] text-center'
+                                              : 'text-rose-600 font-black text-xs min-w-[14px] text-center'
+                                          }
+                                        >
+                                          {stockQty}
+                                        </span>
 
-                                      <span
-                                        className={
-                                          stockQty > 0
-                                            ? 'text-[#8A2B43] font-black text-xs min-w-[16px] text-center'
-                                            : 'text-rose-600 font-black text-xs min-w-[16px] text-center'
-                                        }
-                                      >
-                                        {stockQty}
-                                      </span>
-
-                                      {/* Increase Stock Button */}
-                                      <button
-                                        type="button"
-                                        onClick={(e) => handleStockChange(v.id, stockQty, 1, e)}
-                                        className="w-5 h-5 rounded-lg bg-gray-100 hover:bg-[#8A2B43] hover:text-white text-gray-800 font-black flex items-center justify-center text-xs transition-all shrink-0 active:scale-95 border border-gray-200/80"
-                                        title="زيادة الكمية +1"
-                                      >
-                                        +
-                                      </button>
+                                        {/* Increase Stock Button */}
+                                        <button
+                                          type="button"
+                                          onClick={(e) => handleStockChange(v.id, stockQty, 1, e)}
+                                          className="w-5 h-5 rounded-lg bg-gray-100 hover:bg-[#8A2B43] hover:text-white text-gray-800 font-black flex items-center justify-center text-xs transition-all shrink-0 active:scale-95 border border-gray-200/80"
+                                          title="زيادة الكمية +1"
+                                        >
+                                          +
+                                        </button>
+                                      </div>
                                     </div>
                                   );
                                 })}
