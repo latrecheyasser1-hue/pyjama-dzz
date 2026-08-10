@@ -12,7 +12,7 @@ interface InventoryManagerProps {
   activeStockTab?: StockType;
   onUpdateStock: (variantId: string, stockType: StockType, newQuantity: number) => void;
   onAddProduct?: (newProduct: Product) => void;
-  onDeleteProduct?: (productId: string) => void;
+  onDeleteProduct?: (productId: string, stockType?: StockType) => void;
   onUpdateProduct?: (updatedProduct: Product) => void;
   reFetchProducts?: () => Promise<void>;
 }

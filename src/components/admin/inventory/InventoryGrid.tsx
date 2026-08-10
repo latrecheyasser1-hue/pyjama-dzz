@@ -20,7 +20,7 @@ interface InventoryGridProps {
   categories?: Category[];
   activeStockTab: StockType;
   onUpdateStock: (variantId: string, stockType: StockType, newQuantity: number) => void;
-  onDeleteProduct?: (productId: string) => void;
+  onDeleteProduct?: (productId: string, stockType: StockType) => void;
   onEditProduct?: (product: Product) => void;
 }
 
@@ -35,7 +35,18 @@ export default function InventoryGrid({
   // Level 1 vs Level 2 state
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
-  // Group categories dynamically from DB categories AND products
+  // Helper: Check if product has active stock > 0 in current warehouse context
+  const hasStockInActiveWarehouse = (p: Product): boolean => {
+    if (!p.variants || p.variants.length === 0) return true;
+    return p.variants.some((v) => {
+      if (activeStockTab === 'DELIVERY') return (v.deliveryStock || 0) > 0;
+      if (activeStockTab === 'STORE') return (v.storeStock || 0) > 0;
+      if (activeStockTab === 'WHOLESALE') return (v.wholesaleStock || 0) > 0;
+      return true;
+    });
+  };
+
+  // Group categories dynamically from DB categories AND active warehouse products
   const categoryStatsMap: Record<string, { id: string; name: string; count: number; imageUrl?: string }> = {};
 
   // Seed with registered categories from database
@@ -48,27 +59,33 @@ export default function InventoryGrid({
     };
   });
 
-  // Add product counts per category
+  // Add product counts per category (filtered by active warehouse stock)
   products.forEach((p) => {
-    const catId = p.categoryId || 'uncategorized';
-    const catName = p.categoryNameAr || 'أقسام عامة';
-    if (!categoryStatsMap[catId]) {
-      categoryStatsMap[catId] = {
-        id: catId,
-        name: catName,
-        count: 0,
-        imageUrl: p.imageUrl,
-      };
+    if (hasStockInActiveWarehouse(p)) {
+      const catId = p.categoryId || 'uncategorized';
+      const catName = p.categoryNameAr || 'أقسام عامة';
+      if (!categoryStatsMap[catId]) {
+        categoryStatsMap[catId] = {
+          id: catId,
+          name: catName,
+          count: 0,
+          imageUrl: p.imageUrl,
+        };
+      }
+      categoryStatsMap[catId].count += 1;
     }
-    categoryStatsMap[catId].count += 1;
   });
 
   const categoryCardsList = Object.values(categoryStatsMap);
 
-  // Level 2 Products Filter
+  // Level 2 Products Filter (Filtered by Category AND Active Warehouse Stock)
   const activeProducts = products.filter((p) => {
-    if (!selectedCategoryId) return true;
-    return p.categoryId === selectedCategoryId || (!p.categoryId && selectedCategoryId === 'uncategorized');
+    const matchesCategory =
+      !selectedCategoryId ||
+      p.categoryId === selectedCategoryId ||
+      (!p.categoryId && selectedCategoryId === 'uncategorized');
+
+    return matchesCategory && hasStockInActiveWarehouse(p);
   });
 
   const activeCategoryName =
@@ -76,9 +93,17 @@ export default function InventoryGrid({
 
   const handleDelete = (e: React.MouseEvent, productId: string, name: string) => {
     e.stopPropagation();
-    if (!confirm(`هل أنت تأكد من حذف المنتج "${name}"؟`)) return;
+    const warehouseName =
+      activeStockTab === 'DELIVERY'
+        ? 'مخزون التوصيل'
+        : activeStockTab === 'STORE'
+        ? 'مخزون المحل'
+        : 'مخزون الجملة';
+
+    if (!confirm(`هل أنت تأكد من إزالة المنتج "${name}" من (${warehouseName})؟`)) return;
+
     if (onDeleteProduct) {
-      onDeleteProduct(productId);
+      onDeleteProduct(productId, activeStockTab);
     }
   };
 
@@ -101,10 +126,10 @@ export default function InventoryGrid({
           <div className="flex items-center justify-between">
             <h3 className="text-base sm:text-lg font-bold text-pyjama-charcoal flex items-center gap-2">
               <Layers className="w-5 h-5 text-[#8A2B43]" />
-              <span>أقسام المخزون المتاحة (Inventory Categories)</span>
+              <span>أقسام المخزون المتاحة ({activeStockTab === 'DELIVERY' ? 'مخزون التوصيل' : activeStockTab === 'STORE' ? 'مخزون المحل' : 'مخزون الجملة'})</span>
             </h3>
             <span className="text-xs font-bold text-gray-500">
-              إجمالي الأقسام: {categoryCardsList.length}
+              إجمالي الأقسام النشطة: {categoryCardsList.filter((c) => c.count > 0).length}
             </span>
           </div>
 
@@ -116,7 +141,6 @@ export default function InventoryGrid({
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-              {/* Dynamic Category Cards ONLY */}
               {categoryCardsList.map((cat) => (
                 <div
                   key={cat.id}
@@ -172,7 +196,7 @@ export default function InventoryGrid({
               <div className="w-16 h-16 rounded-3xl bg-pyjama-cream border border-pyjama-pink/40 text-[#8A2B43] flex items-center justify-center mx-auto shadow-sm">
                 <PackageCheck className="w-8 h-8" />
               </div>
-              <h3 className="text-lg font-bold text-pyjama-charcoal">لا توجد منتجات في هذا القسم حالياً</h3>
+              <h3 className="text-lg font-bold text-pyjama-charcoal">لا توجد منتجات متوفرة بمخزون هذا المستودع</h3>
               <p className="text-xs text-gray-500 max-w-sm mx-auto">
                 اضغط على زر العودة للأقسام لتصفح بقية أقسام المتجر.
               </p>
@@ -195,12 +219,6 @@ export default function InventoryGrid({
                         <span className="px-2.5 py-1 bg-pyjama-pink-soft text-[#8A2B43] text-[10px] font-bold rounded-lg border border-pyjama-pink/30">
                           {product.categoryNameAr || 'منتج عام'}
                         </span>
-
-                        {product.isSurCommande && (
-                          <span className="px-2.5 py-1 bg-purple-100 text-purple-900 text-[10px] font-bold rounded-lg border border-purple-200 flex items-center gap-1">
-                            <Clock className="w-3 h-3" /> Sur Commande
-                          </span>
-                        )}
                       </div>
 
                       <div className="flex items-center gap-1.5">
@@ -210,7 +228,7 @@ export default function InventoryGrid({
                         <button
                           onClick={(e) => handleDelete(e, product.id, product.nameAr)}
                           className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
-                          title="حذف المنتج"
+                          title={`حذف المنتج من ${activeStockTab === 'DELIVERY' ? 'مخزون التوصيل' : activeStockTab === 'STORE' ? 'مخزون المحل' : 'مخزون الجملة'}`}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -263,9 +281,6 @@ export default function InventoryGrid({
                           <span>
                             المخزون ({activeStockTab === 'DELIVERY' ? 'التوصيل' : activeStockTab === 'STORE' ? 'المحل' : 'الجملة'}):
                           </span>
-                          {activeStockTab === 'WHOLESALE' && product.isSurCommande && (
-                            <span className="text-[10px] text-purple-700 font-bold">على الطلب</span>
-                          )}
                         </span>
 
                         <div className="space-y-2 max-h-48 overflow-y-auto pr-1">

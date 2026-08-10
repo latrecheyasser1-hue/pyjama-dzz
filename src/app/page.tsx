@@ -425,12 +425,55 @@ export default function MasterAdminPage() {
     );
   };
 
-  const handleDeleteProduct = async (productId: string) => {
+  const handleDeleteProduct = async (productId: string, stockType?: StockType) => {
     try {
-      await supabase.from('products').delete().eq('id', productId);
-      setProducts((prev) => prev.filter((p) => p.id !== productId));
+      const warehouse = stockType || activeStockTab || 'DELIVERY';
+      const stockColumn =
+        warehouse === 'DELIVERY'
+          ? 'delivery_stock'
+          : warehouse === 'STORE'
+          ? 'store_stock'
+          : 'wholesale_stock';
+
+      // 1. Scoped Warehouse Removal: Zero out stock column for this warehouse across all variants
+      await supabase
+        .from('product_variants')
+        .update({ [stockColumn]: 0 })
+        .eq('product_id', productId);
+
+      // 2. Check if product has 0 stock across ALL 3 warehouses
+      const { data: remainingVars } = await supabase
+        .from('product_variants')
+        .select('delivery_stock, store_stock, wholesale_stock')
+        .eq('product_id', productId);
+
+      const hasRemainingStock = remainingVars?.some(
+        (v) => (v.delivery_stock || 0) > 0 || (v.store_stock || 0) > 0 || (v.wholesale_stock || 0) > 0
+      );
+
+      if (remainingVars && remainingVars.length > 0 && !hasRemainingStock) {
+        // Permanent Hard Delete from products table if 0 stock across all 3 warehouses
+        await supabase.from('products').delete().eq('id', productId);
+        setProducts((prev) => prev.filter((p) => p.id !== productId));
+      } else {
+        // Scoped local update: zero out stock for active warehouse
+        setProducts((prev) =>
+          prev.map((p) => {
+            if (p.id !== productId) return p;
+            return {
+              ...p,
+              variants: p.variants.map((v) => ({
+                ...v,
+                deliveryStock: warehouse === 'DELIVERY' ? 0 : v.deliveryStock,
+                storeStock: warehouse === 'STORE' ? 0 : v.storeStock,
+                wholesaleStock: warehouse === 'WHOLESALE' ? 0 : v.wholesaleStock,
+              })),
+            };
+          })
+        );
+      }
     } catch (err) {
-      console.error('Error deleting product from Supabase:', err);
+      console.error('Error in scoped product deletion:', err);
     }
   };
 
