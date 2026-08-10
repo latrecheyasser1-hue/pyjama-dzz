@@ -105,12 +105,9 @@ export default function AdminSidebar({
                 DZ
               </div>
               <div>
-                <h1 className="text-xl font-black text-white tracking-wide font-sans">
-                  بيجاما دي زيد
-                </h1>
-                <p className="text-[11px] text-[#E8A5B8] font-medium tracking-wider font-mono">
+                <h1 className="text-xl font-black text-white tracking-wider font-mono">
                   Pyjama DZ
-                </p>
+                </h1>
               </div>
             </div>
 
