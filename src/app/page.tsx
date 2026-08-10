@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { Menu, Lock, Sparkles, RefreshCw } from 'lucide-react';
+import React, { useState } from 'react';
+import { Menu, Lock } from 'lucide-react';
 import PinLockScreen from '@/components/admin/PinLockScreen';
 import PinChangeModal from '@/components/admin/PinChangeModal';
 import AdminSidebar from '@/components/admin/AdminSidebar';
@@ -32,6 +32,7 @@ import {
   OrderStatus,
   ComplaintStatus,
 } from '@/types/admin';
+import { DetailedOrder } from '@/types/orders';
 
 // Initial Mock Seed Data
 const initialSettings: AdminSettings = {
@@ -89,14 +90,14 @@ const initialCustomers: Customer[] = [
   },
   {
     id: '3',
-    fullName: 'فاطمة قاسم',
+    fullName: 'محل ياسمين للأناقة (جملة)',
     phone: '+213 773 45 67 89',
     wilaya: 'وهران',
     commune: 'السانية',
-    confirmedOrders: 3,
-    cancelledOrders: 1,
-    totalSpent: 14200,
-    tag: 'NORMAL',
+    confirmedOrders: 12,
+    cancelledOrders: 0,
+    totalSpent: 320000,
+    tag: 'BON_CLIENT',
   },
 ];
 
@@ -128,17 +129,25 @@ const initialProducts: Product[] = [
   },
 ];
 
-const initialOrders: Order[] = [
+// Detailed Seed Orders for Retail & Wholesale
+const initialDetailedOrders: DetailedOrder[] = [
   {
     id: 'o1',
     sequentialId: 1,
     formattedId: '01',
+    orderType: 'RETAIL',
     customerName: 'أمينا بن علي',
     customerPhone: '+213 551 23 45 67',
     wilaya: 'الشلف',
     commune: 'الشلف',
     deliveryType: 'HOME',
-    totalAmountDzd: 5500,
+    carrier: 'YALIDINE',
+    shippingFee: 600,
+    items: [
+      { id: 'i1', productName: 'بيجاما حرير صيفي راقية', sku: 'PYJ-SILK-01', size: 'M', color: 'Burgundy', quantity: 1, unitPrice: 5500 },
+    ],
+    totalQuantity: 1,
+    totalAmountDzd: 6100,
     status: 'UNCONFIRMED',
     createdAt: '2026-08-10 10:15',
   },
@@ -146,27 +155,44 @@ const initialOrders: Order[] = [
     id: 'o2',
     sequentialId: 2,
     formattedId: '02',
-    customerName: 'سارة بودواو',
-    customerPhone: '+213 662 34 56 78',
-    wilaya: 'الجزائر',
-    commune: 'باب الزوار',
+    orderType: 'WHOLESALE',
+    customerName: 'ياسين بومدين',
+    customerPhone: '+213 661 88 99 00',
+    traderBusinessName: 'محل ياسمين للأناقة (وهران)',
+    wilaya: 'وهران',
+    commune: 'وهران المدينة',
     deliveryType: 'STOP_DESK',
-    totalAmountDzd: 4200,
-    status: 'CONFIRMED',
-    createdAt: '2026-08-09 16:30',
+    paymentStatus: 'DEPOSIT',
+    depositAmount: 50000,
+    wholesaleDiscount: 15000,
+    items: [
+      { id: 'i2', productName: 'بيجاما حرير صيفي (سلسلة دوزينة)', sku: 'PYJ-SILK-01', size: 'M/L/XL', color: 'مشكّل', quantity: 24, unitPrice: 3800 },
+      { id: 'i3', productName: 'روب مخملي شتوي (دوزينة)', sku: 'ROB-VELVET-02', size: 'L/XL', color: 'Burgundy', quantity: 12, unitPrice: 6500 },
+    ],
+    totalQuantity: 36,
+    totalAmountDzd: 154200,
+    status: 'UNCONFIRMED',
+    createdAt: '2026-08-10 09:45',
   },
   {
     id: 'o3',
     sequentialId: 3,
     formattedId: '03',
-    customerName: 'فاطمة قاسم',
-    customerPhone: '+213 773 45 67 89',
-    wilaya: 'وهران',
-    commune: 'السانية',
-    deliveryType: 'HOME',
-    totalAmountDzd: 8900,
-    status: 'DELIVERED',
-    createdAt: '2026-08-08 14:10',
+    orderType: 'RETAIL',
+    customerName: 'سارة بودواو',
+    customerPhone: '+213 662 34 56 78',
+    wilaya: 'الجزائر',
+    commune: 'باب الزوار',
+    deliveryType: 'STOP_DESK',
+    carrier: 'ZR_EXPRESS',
+    shippingFee: 400,
+    items: [
+      { id: 'i4', productName: 'روب مخملي شتوي مطرّز', sku: 'ROB-VELVET-02', size: 'XL', color: 'Dusty Pink', quantity: 1, unitPrice: 8900 },
+    ],
+    totalQuantity: 1,
+    totalAmountDzd: 9300,
+    status: 'CONFIRMED',
+    createdAt: '2026-08-09 16:30',
   },
 ];
 
@@ -201,7 +227,7 @@ export default function MasterAdminPage() {
   const [suppliers, setSuppliers] = useState<Supplier[]>(initialSuppliers);
   const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
   const [products, setProducts] = useState<Product[]>(initialProducts);
-  const [orders, setOrders] = useState<Order[]>(initialOrders);
+  const [orders, setOrders] = useState<DetailedOrder[]>(initialDetailedOrders);
   const [expenses, setExpenses] = useState<Expense[]>(initialExpenses);
   const [complaints, setComplaints] = useState<Complaint[]>(initialComplaints);
 
@@ -288,6 +314,21 @@ export default function MasterAdminPage() {
     );
   }
 
+  // Convert DetailedOrder to base Order type for OrderHistoryArchive & Analytics
+  const baseOrders: Order[] = orders.map((o) => ({
+    id: o.id,
+    sequentialId: o.sequentialId,
+    formattedId: o.formattedId,
+    customerName: o.customerName,
+    customerPhone: o.customerPhone,
+    wilaya: o.wilaya,
+    commune: o.commune,
+    deliveryType: o.deliveryType,
+    totalAmountDzd: o.totalAmountDzd,
+    status: o.status,
+    createdAt: o.createdAt,
+  }));
+
   return (
     <div className="min-h-screen bg-pyjama-cream flex flex-col lg:flex-row text-pyjama-charcoal font-sans dir-rtl" dir="rtl">
       {/* Admin Sidebar */}
@@ -315,7 +356,7 @@ export default function MasterAdminPage() {
 
             <div>
               <h1 className="text-lg sm:text-xl font-black text-pyjama-charcoal">
-                {activeSection === 'NEW_ORDERS' && 'الطلبيات الجديدة الواردة (Alerts)'}
+                {activeSection === 'NEW_ORDERS' && 'الطلبيات الجديدة الواردة (Retail & Wholesale)'}
                 {activeSection === 'INVENTORY' && 'المخزون والمستودعات الثلاثة (Inventory)'}
                 {activeSection === 'CATEGORIES' && 'الأقسام والتصنيفات (Categories)'}
                 {activeSection === 'SUPPLIERS' && 'إدارة الموردين والورشات (Suppliers)'}
@@ -346,7 +387,7 @@ export default function MasterAdminPage() {
         {/* Section View Router */}
         {activeSection === 'NEW_ORDERS' && (
           <NewOrdersTicker
-            unconfirmedOrders={unconfirmedOrders}
+            orders={orders}
             onConfirmOrder={handleConfirmOrder}
             onCancelOrder={handleCancelOrder}
           />
@@ -388,7 +429,7 @@ export default function MasterAdminPage() {
 
         {activeSection === 'ANALYTICS' && (
           <AnalyticsFinancials
-            orders={orders}
+            orders={baseOrders}
             products={products}
             expenses={expenses}
           />
@@ -396,7 +437,7 @@ export default function MasterAdminPage() {
 
         {activeSection === 'ORDER_HISTORY' && (
           <OrderHistoryArchive
-            orders={orders}
+            orders={baseOrders}
             complaints={complaints}
             onUpdateOrderStatus={handleUpdateOrderStatus}
           />
