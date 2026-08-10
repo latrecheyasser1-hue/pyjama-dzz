@@ -1,10 +1,17 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useCallback } from 'react';
 import { Menu, Lock } from 'lucide-react';
 import PinLockScreen from '@/components/admin/PinLockScreen';
 import PinChangeModal from '@/components/admin/PinChangeModal';
 import AdminSidebar from '@/components/admin/AdminSidebar';
+import {
+  NotificationControls,
+  ToastNotificationContainer,
+} from '@/components/admin/NotificationBanner';
+
+// Custom Hooks
+import { useOrderNotification } from '@/hooks/useOrderNotification';
 
 // Sections
 import NewOrdersTicker from '@/components/admin/sections/NewOrdersTicker';
@@ -129,7 +136,6 @@ const initialProducts: Product[] = [
   },
 ];
 
-// Detailed Seed Orders for Retail & Wholesale
 const initialDetailedOrders: DetailedOrder[] = [
   {
     id: 'o1',
@@ -230,6 +236,65 @@ export default function MasterAdminPage() {
   const [orders, setOrders] = useState<DetailedOrder[]>(initialDetailedOrders);
   const [expenses, setExpenses] = useState<Expense[]>(initialExpenses);
   const [complaints, setComplaints] = useState<Complaint[]>(initialComplaints);
+
+  // Real-time Order Notification Callback
+  const handleRealtimeNewOrder = useCallback((rawOrder: any) => {
+    if (!rawOrder) return;
+    const newOrder: DetailedOrder = {
+      id: rawOrder.id || String(Date.now()),
+      sequentialId: rawOrder.sequential_id || orders.length + 1,
+      formattedId: rawOrder.formatted_id || String(orders.length + 1).padStart(2, '0'),
+      orderType: rawOrder.order_type || 'RETAIL',
+      customerName: rawOrder.customer_name || 'زبون جديد',
+      customerPhone: rawOrder.customer_phone || '+213 550 00 00 00',
+      wilaya: rawOrder.wilaya || 'الشلف',
+      commune: rawOrder.commune || 'الشلف',
+      deliveryType: rawOrder.delivery_type || 'HOME',
+      totalAmountDzd: rawOrder.total_amount_dzd || 6500,
+      items: rawOrder.items || [
+        { id: 'i-new', productName: 'بيجاما صيفية جديدة', sku: 'PYJ-NEW', size: 'L', color: 'Burgundy', quantity: 1, unitPrice: 6500 },
+      ],
+      totalQuantity: rawOrder.total_quantity || 1,
+      status: 'UNCONFIRMED',
+      createdAt: new Date().toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    setOrders((prev) => [newOrder, ...prev]);
+  }, [orders.length]);
+
+  // Hook Initialization
+  const {
+    isMuted,
+    toggleSound,
+    toastAlerts,
+    dismissToast,
+    triggerNewOrderAlert,
+  } = useOrderNotification(handleRealtimeNewOrder);
+
+  // Manual Test Sound Alert Trigger
+  const handleTestSoundAlert = () => {
+    const mockOrder: DetailedOrder = {
+      id: String(Date.now()),
+      sequentialId: orders.length + 1,
+      formattedId: String(orders.length + 1).padStart(2, '0'),
+      orderType: Math.random() > 0.5 ? 'RETAIL' : 'WHOLESALE',
+      customerName: 'مريم الزهراء',
+      customerPhone: '+213 554 99 88 77',
+      wilaya: 'الشلف',
+      commune: 'الشلف',
+      deliveryType: 'HOME',
+      totalAmountDzd: 7800,
+      items: [
+        { id: 'i-test', productName: 'طقم بيجاما حرير راقي', sku: 'PYJ-TEST', size: 'L', color: 'Burgundy', quantity: 1, unitPrice: 7800 },
+      ],
+      totalQuantity: 1,
+      status: 'UNCONFIRMED',
+      createdAt: new Date().toLocaleTimeString('ar-DZ', { hour: '2-digit', minute: '2-digit' }),
+    };
+
+    triggerNewOrderAlert(mockOrder);
+    setOrders((prev) => [mockOrder, ...prev]);
+  };
 
   // Unconfirmed Orders Count
   const unconfirmedOrders = orders.filter((o) => o.status === 'UNCONFIRMED');
@@ -372,14 +437,23 @@ export default function MasterAdminPage() {
             </div>
           </div>
 
+          {/* Right Header Action Controls: Sound Toggle & Lock */}
           <div className="flex items-center gap-3">
+            <NotificationControls
+              isMuted={isMuted}
+              onToggleSound={toggleSound}
+              toastAlerts={toastAlerts}
+              onDismissToast={dismissToast}
+              onTestSound={handleTestSoundAlert}
+            />
+
             <button
               onClick={() => setIsLocked(true)}
               className="p-2.5 rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition-all text-xs font-bold flex items-center gap-1.5"
               title="قفل الشاشة"
             >
               <Lock className="w-4 h-4" />
-              <span className="hidden sm:inline">قفل (Lock)</span>
+              <span className="hidden sm:inline">قفل</span>
             </button>
           </div>
         </header>
@@ -451,6 +525,12 @@ export default function MasterAdminPage() {
           />
         )}
       </main>
+
+      {/* Visual Toast Notification Overlay */}
+      <ToastNotificationContainer
+        toastAlerts={toastAlerts}
+        onDismissToast={dismissToast}
+      />
 
       {/* PIN Password Change Modal */}
       <PinChangeModal
