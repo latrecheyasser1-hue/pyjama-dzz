@@ -26,6 +26,59 @@ interface InventoryGridProps {
   reFetchProducts?: () => Promise<void>;
 }
 
+// Color Hex Resolver Helper
+const getColorHex = (colorName: string, variant: any): string => {
+  if (variant?.color_hex) return variant.color_hex;
+  if (variant?.colorHex) return variant.colorHex;
+
+  const normalized = (colorName || '').trim().toLowerCase();
+  const colorMap: Record<string, string> = {
+    أسود: '#000000',
+    noire: '#000000',
+    noir: '#000000',
+    black: '#000000',
+    أبيض: '#ffffff',
+    blanc: '#ffffff',
+    white: '#ffffff',
+    أحمر: '#dc2626',
+    rouge: '#dc2626',
+    red: '#dc2626',
+    وردي: '#ec4899',
+    rose: '#ec4899',
+    pink: '#ec4899',
+    عنابي: '#800020',
+    burgundy: '#800020',
+    bordeaux: '#800020',
+    أزرق: '#2563eb',
+    bleu: '#2563eb',
+    blue: '#2563eb',
+    كحلي: '#1e3a8a',
+    'navy blue': '#1e3a8a',
+    أخضر: '#16a34a',
+    vert: '#16a34a',
+    green: '#16a34a',
+    زيتي: '#556b2f',
+    olive: '#556b2f',
+    أصفر: '#eab308',
+    jaune: '#eab308',
+    yellow: '#eab308',
+    رمادي: '#6b7280',
+    gris: '#6b7280',
+    grey: '#6b7280',
+    gray: '#6b7280',
+    بني: '#78350f',
+    marron: '#78350f',
+    brown: '#78350f',
+    بيج: '#f5f5dc',
+    beige: '#f5f5dc',
+    بنفسجي: '#9333ea',
+    violet: '#9333ea',
+    purple: '#9333ea',
+  };
+
+  return colorMap[normalized] || '#8A2B43';
+};
+
 export default function InventoryGrid({
   products = [],
   categories = [],
@@ -93,6 +146,43 @@ export default function InventoryGrid({
 
   const activeCategoryName =
     categoryCardsList.find((c) => c.id === selectedCategoryId)?.name || 'القسم المحدد';
+
+  // Direct Stock Quantity Change Handler via [+] / [-] Buttons on Size Chips
+  const handleStockChange = async (
+    variantId: string,
+    currentQty: number,
+    delta: number,
+    e: React.MouseEvent
+  ) => {
+    e.stopPropagation(); // Prevents opening edit modal
+    const newQty = Math.max(0, currentQty + delta);
+
+    if (onUpdateStock) {
+      onUpdateStock(variantId, activeStockTab, newQty);
+    }
+
+    const stockColumn =
+      activeStockTab === 'DELIVERY'
+        ? 'delivery_stock'
+        : activeStockTab === 'STORE'
+        ? 'store_stock'
+        : 'wholesale_stock';
+
+    try {
+      const { error } = await supabase
+        .from('product_variants')
+        .update({ [stockColumn]: newQty })
+        .eq('id', variantId);
+
+      if (error) {
+        console.error('Error updating variant stock:', error);
+      } else if (reFetchProducts) {
+        await reFetchProducts();
+      }
+    } catch (err) {
+      console.error('Exception updating variant stock:', err);
+    }
+  };
 
   // Context-Isolated Scoped Warehouse Hiding & Sequential Delete Handler
   const handleDeleteProduct = async (productId: string, e: React.MouseEvent) => {
@@ -348,31 +438,28 @@ export default function InventoryGrid({
                       {/* Color & Size Breakdown per Color */}
                       <div className="space-y-3 pt-3 border-t border-gray-100">
                         {Object.entries(groupedColors).map(([colorName, colorVars]) => {
-                          const firstColorImg = colorVars?.[0]?.colorImageUrl || product.imageUrl;
+                          const hexColorVal = getColorHex(colorName, colorVars?.[0]);
 
                           return (
                             <div
                               key={colorName}
-                              className="bg-pyjama-cream/40 p-3 rounded-2xl border border-gray-100 space-y-2"
+                              className="bg-pyjama-cream/40 p-3 rounded-2xl border border-gray-100 space-y-2.5"
                             >
+                              {/* Color Title with Small Dynamic Color Circle Badge */}
                               <div className="flex items-center justify-between">
                                 <div className="flex items-center gap-2">
-                                  {firstColorImg ? (
-                                    <img
-                                      src={firstColorImg}
-                                      alt={colorName}
-                                      className="w-5 h-5 rounded-full object-cover border border-gray-200"
-                                    />
-                                  ) : (
-                                    <span className="w-3.5 h-3.5 rounded-full bg-[#8A2B43]" />
-                                  )}
+                                  <span
+                                    className="w-4 h-4 rounded-full border border-gray-300 shadow-xs shrink-0"
+                                    style={{ backgroundColor: hexColorVal }}
+                                    title={`درجة اللون: ${colorName}`}
+                                  />
                                   <span className="text-xs font-bold text-pyjama-charcoal">
                                     {colorName}
                                   </span>
                                 </div>
                               </div>
 
-                              {/* Size Stock Chips */}
+                              {/* Size Stock Chips with Interactive [+] / [-] Quick Action Buttons */}
                               <div className="flex flex-wrap gap-1.5">
                                 {colorVars.map((v) => {
                                   const stockQty =
@@ -385,23 +472,43 @@ export default function InventoryGrid({
                                   return (
                                     <div
                                       key={v.id}
-                                      className={`px-2 py-1 rounded-xl text-[10px] font-mono font-bold border flex items-center gap-1 ${
+                                      className={`px-2 py-1 rounded-xl text-[10px] font-mono font-bold border flex items-center gap-1.5 transition-all ${
                                         stockQty > 0
                                           ? 'bg-white text-pyjama-charcoal border-gray-200 shadow-xs'
-                                          : 'bg-rose-50 text-rose-500 border-rose-100 opacity-60'
+                                          : 'bg-rose-50 text-rose-500 border-rose-100 opacity-75'
                                       }`}
                                     >
-                                      <span>{v.size}</span>
-                                      <span className="text-gray-300">•</span>
+                                      <span className="font-bold">{v.size}:</span>
+
+                                      {/* Decrease Stock Button */}
+                                      <button
+                                        type="button"
+                                        onClick={(e) => handleStockChange(v.id, stockQty, -1, e)}
+                                        className="w-4 h-4 rounded bg-gray-100 hover:bg-[#8A2B43] hover:text-white text-gray-700 font-bold flex items-center justify-center text-[10px] transition-colors shrink-0"
+                                        title="إنقاص الكمية -1"
+                                      >
+                                        -
+                                      </button>
+
                                       <span
                                         className={
                                           stockQty > 0
-                                            ? 'text-[#8A2B43] font-black'
-                                            : 'text-rose-500 font-black'
+                                            ? 'text-[#8A2B43] font-black px-0.5'
+                                            : 'text-rose-500 font-black px-0.5'
                                         }
                                       >
                                         {stockQty}
                                       </span>
+
+                                      {/* Increase Stock Button */}
+                                      <button
+                                        type="button"
+                                        onClick={(e) => handleStockChange(v.id, stockQty, 1, e)}
+                                        className="w-4 h-4 rounded bg-gray-100 hover:bg-[#8A2B43] hover:text-white text-gray-700 font-bold flex items-center justify-center text-[10px] transition-colors shrink-0"
+                                        title="زيادة الكمية +1"
+                                      >
+                                        +
+                                      </button>
                                     </div>
                                   );
                                 })}
