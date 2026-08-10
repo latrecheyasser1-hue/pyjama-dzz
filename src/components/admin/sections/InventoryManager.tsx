@@ -3,12 +3,13 @@
 import React, { useState } from 'react';
 import { Search, Plus, PackageCheck, AlertTriangle } from 'lucide-react';
 import { Product, StockType } from '@/types/admin';
+import AddProductModal from '@/components/admin/products/AddProductModal';
 
 interface InventoryManagerProps {
   products: Product[];
   activeStockTab?: StockType;
   onUpdateStock: (variantId: string, stockType: StockType, newQuantity: number) => void;
-  onAddProduct: () => void;
+  onAddProduct?: (newProduct: Product) => void;
 }
 
 export default function InventoryManager({
@@ -18,6 +19,7 @@ export default function InventoryManager({
   onAddProduct,
 }: InventoryManagerProps) {
   const [searchQuery, setSearchQuery] = useState('');
+  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
   const filteredProducts = products.filter((p) =>
     p.nameAr.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -34,6 +36,12 @@ export default function InventoryManager({
         return 'المخزون والمستودعات • مخزون الجملة';
       default:
         return 'المخزون والمستودعات';
+    }
+  };
+
+  const handleProductCreated = (newProd: Product) => {
+    if (onAddProduct) {
+      onAddProduct(newProd);
     }
   };
 
@@ -66,7 +74,7 @@ export default function InventoryManager({
 
           {/* Primary Burgundy Add Product Button */}
           <button
-            onClick={onAddProduct}
+            onClick={() => setIsAddModalOpen(true)}
             className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#8A2B43] hover:bg-[#7A1C32] text-white text-xs font-bold shadow-md transition-all shrink-0"
           >
             <Plus className="w-4 h-4" />
@@ -90,7 +98,7 @@ export default function InventoryManager({
             </p>
           </div>
           <button
-            onClick={onAddProduct}
+            onClick={() => setIsAddModalOpen(true)}
             className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl bg-[#8A2B43] hover:bg-[#7A1C32] text-white text-xs font-bold shadow-md transition-all mt-2"
           >
             <Plus className="w-4 h-4" />
@@ -197,6 +205,13 @@ export default function InventoryManager({
           </div>
         </div>
       )}
+
+      {/* Add Product Modal */}
+      <AddProductModal
+        isOpen={isAddModalOpen}
+        onClose={() => setIsAddModalOpen(false)}
+        onProductAdded={handleProductCreated}
+      />
     </div>
   );
 }

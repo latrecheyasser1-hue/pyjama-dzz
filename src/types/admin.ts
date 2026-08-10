@@ -83,15 +83,35 @@ export interface ProductVariant {
   wholesaleStock: number; // مخزون الجملة
 }
 
+export interface ProductColor {
+  id?: string;
+  productId?: string;
+  colorName: string;
+  imageUrl?: string;
+}
+
+export interface ProductSize {
+  id?: string;
+  productId?: string;
+  sizeName: string;
+}
+
 export interface Product {
   id: string;
   sku: string;
   nameAr: string;
   categoryId?: string;
   categoryNameAr?: string;
+  supplierName?: string;
+  supplierPhone?: string;
   costPrice: number;
   sellingPrice: number;
+  oldPrice?: number | null;
+  wholesalePrice?: number | null;
+  description?: string;
   imageUrl?: string;
+  colors?: ProductColor[];
+  sizes?: string[];
   variants: ProductVariant[];
   createdAt?: string;
 }

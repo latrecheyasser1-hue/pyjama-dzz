@@ -305,6 +305,10 @@ export default function MasterAdminPage() {
     );
   };
 
+  const handleAddProduct = (newProduct: Product) => {
+    setProducts((prev) => [newProduct, ...prev]);
+  };
+
   // Synchronous Supabase Insert with explicit Error Handling & Re-fetch
   const handleAddCategory = async (name: string): Promise<boolean> => {
     if (!name.trim()) return false;
@@ -442,7 +446,7 @@ export default function MasterAdminPage() {
             products={products}
             activeStockTab={activeStockTab}
             onUpdateStock={handleUpdateStock}
-            onAddProduct={() => setActiveSection('SETTINGS')}
+            onAddProduct={handleAddProduct}
           />
         )}
 
