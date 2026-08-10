@@ -112,12 +112,12 @@ export default function AddProductModal({
   const [minSize, setMinSize] = useState('S');
   const [maxSize, setMaxSize] = useState('XL');
 
-  // Color Variants State
+  // Color Variants State - Default to Neutral/Blank Color State
   const [colors, setColors] = useState<ColorInputItem[]>([
     {
       id: 'c-1',
-      colorName: 'Burgundy (عنابي)',
-      colorHex: '#8A2B43',
+      colorName: '',
+      colorHex: '#ffffff',
       imageUrl: '',
       deliveryStocks: { S: 10, M: 10, L: 10, XL: 10 },
       storeStocks: { S: 0, M: 0, L: 0, XL: 0 },
@@ -161,8 +161,8 @@ export default function AddProductModal({
     setColors([
       {
         id: 'c-1',
-        colorName: 'Burgundy (عنابي)',
-        colorHex: '#8A2B43',
+        colorName: '',
+        colorHex: '#ffffff',
         imageUrl: '',
         deliveryStocks: { S: 10, M: 10, L: 10, XL: 10 },
         storeStocks: { S: 0, M: 0, L: 0, XL: 0 },
@@ -267,7 +267,7 @@ export default function AddProductModal({
           return {
             id: `c-edit-${idx}-${Date.now()}`,
             colorName: colorName,
-            colorHex: '#8A2B43',
+            colorHex: '#ffffff',
             imageUrl: c.imageUrl || productToEdit.imageUrl || '',
             deliveryStocks: delStocks,
             storeStocks: storeStocks,
@@ -307,7 +307,7 @@ export default function AddProductModal({
           return {
             id: `c-edit-v-${idx}-${Date.now()}`,
             colorName: colName,
-            colorHex: '#8A2B43',
+            colorHex: '#ffffff',
             imageUrl: productToEdit.imageUrl || '',
             deliveryStocks: delStocks,
             storeStocks: storeStocks,
@@ -378,7 +378,7 @@ export default function AddProductModal({
     setIsStandardSize((prev) => !prev);
   };
 
-  // Color Handlers
+  // Color Handlers - Default new color to neutral/blank
   const handleAddColor = () => {
     const initDel: Record<string, number> = {};
     const initStore: Record<string, number> = {};
@@ -397,7 +397,7 @@ export default function AddProductModal({
       {
         id: `c-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
         colorName: '',
-        colorHex: '#8A2B43',
+        colorHex: '#ffffff',
         imageUrl: '',
         deliveryStocks: initDel,
         storeStocks: initStore,
@@ -419,20 +419,20 @@ export default function AddProductModal({
     setColors((prev) => prev.filter((c) => c.id !== id));
   };
 
-  // Eyedropper API execution
-  const handleOpenEyedropper = async (colorId: string) => {
-    if (typeof window !== 'undefined' && 'EyeDropper' in window) {
-      try {
-        const eyeDropper = new (window as any).EyeDropper();
-        const result = await eyeDropper.open();
-        if (result && result.sRGBHex) {
-          handleUpdateColor(colorId, 'colorHex', result.sRGBHex);
-        }
-      } catch (e) {
-        console.log('Eyedropper closed without selection');
+  // Optimized Eyedropper API execution (Eliminates click delay & unnecessary re-renders)
+  const handlePickColor = async (colorId: string) => {
+    if (!('EyeDropper' in window)) {
+      alert('ميزة قطارة الألوان غير مدعومة في متصفحك');
+      return;
+    }
+    try {
+      const eyeDropper = new (window as any).EyeDropper();
+      const result = await eyeDropper.open();
+      if (result?.sRGBHex) {
+        handleUpdateColor(colorId, 'colorHex', result.sRGBHex);
       }
-    } else {
-      alert('ميزة أداة القطارة غير مدعومة مباشرة في هذا المتصفح. استخدم العجلة الملونة بدلاً منها.');
+    } catch (e) {
+      // User canceled eyedropper selection
     }
   };
 
@@ -1357,11 +1357,11 @@ export default function AddProductModal({
                           {index + 1}
                         </span>
 
-                        {/* Color Circle Badge */}
+                        {/* Color Circle Badge - Neutral Blank State */}
                         <div
-                          className="w-8 h-8 rounded-full border-2 border-white shadow-md shrink-0 transition-transform hover:scale-110"
-                          style={{ backgroundColor: colorItem.colorHex || '#8A2B43' }}
-                          title={`الدرجة المحددة: ${colorItem.colorHex}`}
+                          className="w-8 h-8 rounded-full border-2 border-gray-200 shadow-sm shrink-0 transition-transform hover:scale-110"
+                          style={{ backgroundColor: colorItem.colorHex || '#ffffff' }}
+                          title={colorItem.colorHex ? `الدرجة المحددة: ${colorItem.colorHex}` : 'لم يتم تحديد درجة اللون بعد'}
                         />
 
                         {/* Color Name Input */}
@@ -1378,7 +1378,7 @@ export default function AddProductModal({
                         <div className="flex items-center gap-1.5 shrink-0">
                           <input
                             type="color"
-                            value={colorItem.colorHex || '#8A2B43'}
+                            value={colorItem.colorHex || '#ffffff'}
                             onChange={(e) => handleUpdateColor(colorItem.id, 'colorHex', e.target.value)}
                             className="w-9 h-9 p-0.5 rounded-xl border border-gray-200 cursor-pointer bg-white"
                             title="عجلة الألوان"
@@ -1386,7 +1386,7 @@ export default function AddProductModal({
 
                           <button
                             type="button"
-                            onClick={() => handleOpenEyedropper(colorItem.id)}
+                            onClick={() => handlePickColor(colorItem.id)}
                             className="p-2.5 rounded-xl bg-pyjama-pink-soft text-[#8A2B43] hover:bg-[#8A2B43] hover:text-white transition-all shadow-sm"
                             title="التقاط درجة اللون مباشرة من الصورة"
                           >
