@@ -261,17 +261,36 @@ export default function MasterAdminPage() {
     }
   }, []);
 
-  // Fetch Live Products from Supabase
+  // Fetch Live Products from Supabase (Includes product_variants join with color_image_url)
   const fetchProducts = useCallback(async () => {
     try {
-      const { data: prodData, error: prodError } = await supabase
+      let { data: prodData, error: prodError } = await supabase
         .from('products')
-        .select('*')
+        .select(`
+          *,
+          product_variants (
+            id,
+            product_id,
+            color_name,
+            color_hex,
+            color_image_url,
+            size,
+            size_name,
+            delivery_stock,
+            store_stock,
+            wholesale_stock,
+            serie_composition
+          )
+        `)
         .order('created_at', { ascending: false });
 
       if (prodError) {
-        console.warn('Supabase products select notice:', prodError.message || prodError);
-        return;
+        console.warn('Notice on joined query, executing fallback select:', prodError.message || prodError);
+        const fallback = await supabase
+          .from('products')
+          .select('*')
+          .order('created_at', { ascending: false });
+        prodData = fallback.data;
       }
 
       if (!prodData || prodData.length === 0) {
