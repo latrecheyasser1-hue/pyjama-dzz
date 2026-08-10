@@ -33,16 +33,26 @@ export type SizeCategoryKey = 'CLOTHING' | 'SHOES' | 'LINGERIE';
 
 export const SIZE_CATEGORIES: Record<SizeCategoryKey, { label: string; sizes: string[] }> = {
   CLOTHING: {
-    label: 'ملابس وبيجامات (Clothing)',
-    sizes: ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL'],
+    label: 'ملابس وبيجامات (Clothing & Pyjamas)',
+    sizes: ['3XS', '2XS', 'XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', '4XL', '5XL', '6XL'],
   },
   SHOES: {
-    label: 'أحذية وبانتوف (Shoes / Pointure)',
-    sizes: ['35', '36', '37', '38', '39', '40', '41', '42', '43'],
+    label: 'أحذية وبانتوف (Shoes & Footwear)',
+    sizes: [
+      '16', '17', '18', '19', '20', '21', '22', '23', '24', '25',
+      '26', '27', '28', '29', '30', '31', '32', '33', '34', '35',
+      '36', '37', '38', '39', '40', '41', '42', '43', '44', '45',
+      '46', '47', '48', '49', '50',
+    ],
   },
   LINGERIE: {
     label: 'لانجري وصدريات (Lingerie Cups)',
-    sizes: ['80B', '85B', '90B', '95B', '100B', '105B'],
+    sizes: [
+      '70A', '75A', '80A', '85A', '90A',
+      '70B', '75B', '80B', '85B', '90B', '95B', '100B', '105B', '110B', '115B', '120B',
+      '80C', '85C', '90C', '95C', '100C', '105C', '110C', '115C', '120C',
+      '85D', '90D', '95D', '100D', '105D', '110D',
+    ],
   },
 };
 
