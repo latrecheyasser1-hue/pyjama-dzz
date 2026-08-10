@@ -43,9 +43,10 @@ export function useOrderNotification(onNewOrderReceived?: (newOrderData: any) =>
         playNewOrderChime();
       }
 
-      // Add visual toast notification
+      // Add visual toast notification with guaranteed unique ID
+      const uniqueId = `toast-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
       const newToast: ToastAlert = {
-        id: String(Date.now()),
+        id: uniqueId,
         title: '📦 طلبية جديدة واردة الآن!',
         message: orderData?.customerName
           ? `طلب جديد باسم ${orderData.customerName} بقيمة ${orderData.totalAmountDzd || ''} DZD`
@@ -123,6 +124,6 @@ export function useOrderNotification(onNewOrderReceived?: (newOrderData: any) =>
     toggleSound,
     toastAlerts,
     dismissToast,
-    triggerNewOrderAlert, // Can be called manually for demo testing
+    triggerNewOrderAlert,
   };
 }

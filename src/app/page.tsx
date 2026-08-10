@@ -61,20 +61,20 @@ const initialSettings: AdminSettings = {
 };
 
 const initialCategories: Category[] = [
-  { id: '1', nameAr: 'بيجامات حريرية', nameFr: 'Pyjamas Hiver', slug: 'pyjamas-hiver' },
-  { id: '2', nameAr: 'ملابس النوم', nameFr: 'Nuisettes & Lingerie', slug: 'nuisettes-lingerie' },
-  { id: '3', nameAr: 'أحذية داخلية', nameFr: 'Chaussons & Pantoufles', slug: 'chaussons' },
-  { id: '4', nameAr: 'روب دو شامبر', nameFr: 'Peignoirs & Robes', slug: 'peignoirs' },
+  { id: 'cat-1', nameAr: 'بيجامات حريرية', nameFr: 'Pyjamas Hiver', slug: 'pyjamas-hiver' },
+  { id: 'cat-2', nameAr: 'ملابس النوم', nameFr: 'Nuisettes & Lingerie', slug: 'nuisettes-lingerie' },
+  { id: 'cat-3', nameAr: 'أحذية داخلية', nameFr: 'Chaussons & Pantoufles', slug: 'chaussons' },
+  { id: 'cat-4', nameAr: 'روب دو شامبر', nameFr: 'Peignoirs & Robes', slug: 'peignoirs' },
 ];
 
 const initialSuppliers: Supplier[] = [
-  { id: '1', name: 'مؤسسة الأناقة للمنسوجات', phone: '+213 550 12 34 56', totalOrders: 15, outstandingBalance: 120000 },
-  { id: '2', name: 'ورشة البهجة للبيجاما', phone: '+213 661 98 76 54', totalOrders: 8, outstandingBalance: 45000 },
+  { id: 'sup-1', name: 'مؤسسة الأناقة للمنسوجات', phone: '+213 550 12 34 56', totalOrders: 15, outstandingBalance: 120000 },
+  { id: 'sup-2', name: 'ورشة البهجة للبيجاما', phone: '+213 661 98 76 54', totalOrders: 8, outstandingBalance: 45000 },
 ];
 
 const initialCustomers: Customer[] = [
   {
-    id: '1',
+    id: 'cust-1',
     fullName: 'أمينا بن علي',
     phone: '+213 551 23 45 67',
     wilaya: 'الشلف',
@@ -85,7 +85,7 @@ const initialCustomers: Customer[] = [
     tag: 'BON_CLIENT',
   },
   {
-    id: '2',
+    id: 'cust-2',
     fullName: 'سارة بودواو',
     phone: '+213 662 34 56 78',
     wilaya: 'الجزائر',
@@ -96,7 +96,7 @@ const initialCustomers: Customer[] = [
     tag: 'MAUVAIS_CLIENT',
   },
   {
-    id: '3',
+    id: 'cust-3',
     fullName: 'محل ياسمين للأناقة (جملة)',
     phone: '+213 773 45 67 89',
     wilaya: 'وهران',
@@ -110,35 +110,36 @@ const initialCustomers: Customer[] = [
 
 const initialProducts: Product[] = [
   {
-    id: '1',
+    id: 'prod-1',
     sku: 'PYJ-SILK-01',
     nameAr: 'بيجاما حرير صيفي راقية',
-    categoryId: '1',
+    categoryId: 'cat-1',
     categoryNameAr: 'بيجامات حريرية',
     costPrice: 2800,
     sellingPrice: 5500,
     variants: [
-      { id: 'v1', productId: '1', size: 'M', color: 'زهري (Burgundy)', deliveryStock: 12, storeStock: 8, wholesaleStock: 25 },
-      { id: 'v2', productId: '1', size: 'L', color: 'زهري (Burgundy)', deliveryStock: 2, storeStock: 5, wholesaleStock: 10 },
+      { id: 'v1', productId: 'prod-1', size: 'M', color: 'زهري (Burgundy)', deliveryStock: 12, storeStock: 8, wholesaleStock: 25 },
+      { id: 'v2', productId: 'prod-1', size: 'L', color: 'زهري (Burgundy)', deliveryStock: 2, storeStock: 5, wholesaleStock: 10 },
     ],
   },
   {
-    id: '2',
+    id: 'prod-2',
     sku: 'ROB-VELVET-02',
     nameAr: 'روب مخملي شتوي مطرّز',
-    categoryId: '4',
+    categoryId: 'cat-4',
     categoryNameAr: 'روب دو شامبر',
     costPrice: 4200,
     sellingPrice: 8900,
     variants: [
-      { id: 'v3', productId: '2', size: 'XL', color: 'وردي ناعم (Dusty Pink)', deliveryStock: 15, storeStock: 10, wholesaleStock: 30 },
+      { id: 'v3', productId: 'prod-2', size: 'XL', color: 'وردي ناعم (Dusty Pink)', deliveryStock: 15, storeStock: 10, wholesaleStock: 30 },
     ],
   },
 ];
 
+// Detailed Seed Orders for Retail & Wholesale
 const initialDetailedOrders: DetailedOrder[] = [
   {
-    id: 'o1',
+    id: 'ord-1',
     sequentialId: 1,
     formattedId: '01',
     orderType: 'RETAIL',
@@ -158,7 +159,7 @@ const initialDetailedOrders: DetailedOrder[] = [
     createdAt: '2026-08-10 10:15',
   },
   {
-    id: 'o2',
+    id: 'ord-2',
     sequentialId: 2,
     formattedId: '02',
     orderType: 'WHOLESALE',
@@ -181,7 +182,7 @@ const initialDetailedOrders: DetailedOrder[] = [
     createdAt: '2026-08-10 09:45',
   },
   {
-    id: 'o3',
+    id: 'ord-3',
     sequentialId: 3,
     formattedId: '03',
     orderType: 'RETAIL',
@@ -203,9 +204,9 @@ const initialDetailedOrders: DetailedOrder[] = [
 ];
 
 const initialExpenses: Expense[] = [
-  { id: 'e1', title: 'شراء قماش حرير شتاء', amountDzd: 150000, category: 'COGS', expenseDate: '2026-08-01' },
-  { id: 'e2', title: 'مصاريف الشحن والمرتجعات', amountDzd: 12500, category: 'SHIPPING_RETURN', expenseDate: '2026-08-05' },
-  { id: 'e3', title: 'كهرباء وتدفئة المحل', amountDzd: 8500, category: 'OPERATING', expenseDate: '2026-08-07' },
+  { id: 'exp-1', title: 'شراء قماش حرير شتاء', amountDzd: 150000, category: 'COGS', expenseDate: '2026-08-01' },
+  { id: 'exp-2', title: 'مصاريف الشحن والمرتجعات', amountDzd: 12500, category: 'SHIPPING_RETURN', expenseDate: '2026-08-05' },
+  { id: 'exp-3', title: 'كهرباء وتدفئة المحل', amountDzd: 8500, category: 'OPERATING', expenseDate: '2026-08-07' },
 ];
 
 const initialComplaints: Complaint[] = [
@@ -240,8 +241,9 @@ export default function MasterAdminPage() {
   // Real-time Order Notification Callback
   const handleRealtimeNewOrder = useCallback((rawOrder: any) => {
     if (!rawOrder) return;
+    const uniqueId = rawOrder.id || `ord-rt-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     const newOrder: DetailedOrder = {
-      id: rawOrder.id || String(Date.now()),
+      id: uniqueId,
       sequentialId: rawOrder.sequential_id || orders.length + 1,
       formattedId: rawOrder.formatted_id || String(orders.length + 1).padStart(2, '0'),
       orderType: rawOrder.order_type || 'RETAIL',
@@ -252,7 +254,7 @@ export default function MasterAdminPage() {
       deliveryType: rawOrder.delivery_type || 'HOME',
       totalAmountDzd: rawOrder.total_amount_dzd || 6500,
       items: rawOrder.items || [
-        { id: 'i-new', productName: 'بيجاما صيفية جديدة', sku: 'PYJ-NEW', size: 'L', color: 'Burgundy', quantity: 1, unitPrice: 6500 },
+        { id: `i-${Date.now()}`, productName: 'بيجاما صيفية جديدة', sku: 'PYJ-NEW', size: 'L', color: 'Burgundy', quantity: 1, unitPrice: 6500 },
       ],
       totalQuantity: rawOrder.total_quantity || 1,
       status: 'UNCONFIRMED',
@@ -273,8 +275,9 @@ export default function MasterAdminPage() {
 
   // Manual Test Sound Alert Trigger
   const handleTestSoundAlert = () => {
+    const uniqueId = `ord-test-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
     const mockOrder: DetailedOrder = {
-      id: String(Date.now()),
+      id: uniqueId,
       sequentialId: orders.length + 1,
       formattedId: String(orders.length + 1).padStart(2, '0'),
       orderType: Math.random() > 0.5 ? 'RETAIL' : 'WHOLESALE',
@@ -285,7 +288,7 @@ export default function MasterAdminPage() {
       deliveryType: 'HOME',
       totalAmountDzd: 7800,
       items: [
-        { id: 'i-test', productName: 'طقم بيجاما حرير راقي', sku: 'PYJ-TEST', size: 'L', color: 'Burgundy', quantity: 1, unitPrice: 7800 },
+        { id: `item-${Date.now()}`, productName: 'طقم بيجاما حرير راقي', sku: 'PYJ-TEST', size: 'L', color: 'Burgundy', quantity: 1, unitPrice: 7800 },
       ],
       totalQuantity: 1,
       status: 'UNCONFIRMED',
@@ -330,7 +333,7 @@ export default function MasterAdminPage() {
 
   const handleAddCategory = (nameAr: string, nameFr: string) => {
     const newCat: Category = {
-      id: String(Date.now()),
+      id: `cat-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
       nameAr,
       nameFr,
       slug: nameFr.toLowerCase().replace(/\s+/g, '-'),
@@ -345,7 +348,7 @@ export default function MasterAdminPage() {
   const handleAddSupplier = (supplier: Omit<Supplier, 'id'>) => {
     const newSup: Supplier = {
       ...supplier,
-      id: String(Date.now()),
+      id: `sup-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
     };
     setSuppliers((prev) => [...prev, newSup]);
   };
