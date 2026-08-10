@@ -94,47 +94,66 @@ export default function InventoryGrid({
   const activeCategoryName =
     categoryCardsList.find((c) => c.id === selectedCategoryId)?.name || 'القسم المحدد';
 
-  // Strict Sequential Delete Handler (Deletes variants first to prevent Foreign Key constraints)
+  // Context-Isolated Scoped Warehouse Hiding & Sequential Delete Handler
   const handleDeleteProduct = async (productId: string, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevents triggering card edit modal
 
-    if (!confirm('هل أنت تأكد من رغبتك في حذف هذا المنتج وكل ألوانه ومقاساته نهائياً؟')) {
+    const warehouseLabel =
+      activeStockTab === 'DELIVERY'
+        ? 'مخزون التوصيل'
+        : activeStockTab === 'STORE'
+        ? 'مخزون المحل'
+        : 'مخزون الجملة';
+
+    if (!confirm(`هل أنت تأكد من إزالة هذا المنتج من (${warehouseLabel})؟`)) {
       return;
     }
 
     try {
-      // 1. Delete child records in product_variants first (to avoid FK constraint blocks)
-      const { error: variantErr } = await supabase
-        .from('product_variants')
-        .delete()
-        .eq('product_id', productId);
+      if (onDeleteProduct) {
+        await onDeleteProduct(productId, activeStockTab);
+      } else {
+        const stockColumn =
+          activeStockTab === 'DELIVERY'
+            ? 'delivery_stock'
+            : activeStockTab === 'STORE'
+            ? 'store_stock'
+            : 'wholesale_stock';
 
-      if (variantErr) {
-        console.error('Error deleting variants:', variantErr);
+        // 1. Scoped removal: zero out active warehouse stock column in product_variants
+        await supabase
+          .from('product_variants')
+          .update({ [stockColumn]: 0 })
+          .eq('product_id', productId);
+
+        // 2. Check if product has remaining stock > 0 across ANY warehouse
+        const { data: remainingVars } = await supabase
+          .from('product_variants')
+          .select('delivery_stock, store_stock, wholesale_stock')
+          .eq('product_id', productId);
+
+        const hasAnyStockLeft = remainingVars?.some(
+          (v) => (v.delivery_stock || 0) > 0 || (v.store_stock || 0) > 0 || (v.wholesale_stock || 0) > 0
+        );
+
+        if (remainingVars && remainingVars.length > 0 && !hasAnyStockLeft) {
+          // If total stock across ALL 3 warehouses is 0, execute hard delete
+          await supabase.from('product_variants').delete().eq('product_id', productId);
+          await supabase.from('products').delete().eq('id', productId);
+          alert('تم حذف المنتج نهائياً من النظام لعدم وجود توفر في أي مستودع!');
+        } else {
+          alert(`تم إزالة المنتج من (${warehouseLabel}) بنجاح!`);
+        }
       }
 
-      // 2. Delete parent record in products table
-      const { error: productErr } = await supabase
-        .from('products')
-        .delete()
-        .eq('id', productId);
-
-      if (productErr) {
-        alert('تعذر حذف المنتج من قاعدة البيانات: ' + productErr.message);
-        console.error('Delete Product Error:', productErr);
-        return;
-      }
-
-      alert('تم حذف المنتج بنجاح!');
-
-      // 3. Force re-fetch/refresh state
+      // 3. Refresh UI dynamically
       if (typeof reFetchProducts === 'function') {
         await reFetchProducts();
       } else {
         window.location.reload();
       }
     } catch (err: any) {
-      alert('حدث خطأ أثناء الحذف: ' + (err?.message || String(err)));
+      alert('حدث خطأ أثناء إزالة المنتج: ' + (err?.message || String(err)));
     }
   };
 
@@ -266,7 +285,7 @@ export default function InventoryGrid({
                           type="button"
                           onClick={(e) => handleDeleteProduct(product.id, e)}
                           className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all z-10"
-                          title="حذف هذا المنتج"
+                          title={`إزالة هذا المنتج من ${activeStockTab === 'DELIVERY' ? 'مخزون التوصيل' : activeStockTab === 'STORE' ? 'مخزون المحل' : 'مخزون الجملة'}`}
                         >
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
