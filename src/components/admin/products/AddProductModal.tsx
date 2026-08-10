@@ -339,10 +339,11 @@ export default function AddProductModal({
     }
   };
 
-  // Helper to generate random SKU
+  // Helper to generate unique SKU
   const handleAutoGenerateSku = () => {
-    const randomNum = Math.floor(100000 + Math.random() * 900000);
-    setSku(`PYJ-${randomNum}`);
+    const timestampSuffix = Date.now().toString().slice(-4);
+    const randomNum = Math.floor(100 + Math.random() * 900);
+    setSku(`PYJ-${timestampSuffix}${randomNum}`);
   };
 
   // Helper to calculate sizes array
@@ -594,7 +595,7 @@ export default function AddProductModal({
     return false;
   };
 
-  // Resilient Product Insert/Update Helper with Schema Cache Fallback
+  // Resilient Product Insert/Update Helper with Schema Cache & Unique SKU Constraint Fallbacks
   const insertOrUpdateProductWithResilience = async (
     payload: Record<string, any>,
     targetProductId?: string
@@ -603,6 +604,25 @@ export default function AddProductModal({
       ? await supabase.from('products').update(payload).eq('id', targetProductId).select().single()
       : await supabase.from('products').insert([payload]).select().single();
 
+    // Fallback 1: Duplicate SKU Key Constraint Violation
+    if (
+      result.error &&
+      (result.error.message?.includes('products_sku_key') ||
+        result.error.message?.includes('duplicate key value') ||
+        result.error.details?.includes('products_sku_key'))
+    ) {
+      console.warn('Duplicate SKU detected. Generating unique SKU suffix and retrying...');
+      const fallbackPayload = {
+        ...payload,
+        sku: `${payload.sku || 'PYJ'}-${Date.now().toString().slice(-4)}${Math.floor(100 + Math.random() * 900)}`,
+      };
+
+      result = targetProductId
+        ? await supabase.from('products').update(fallbackPayload).eq('id', targetProductId).select().single()
+        : await supabase.from('products').insert([fallbackPayload]).select().single();
+    }
+
+    // Fallback 2: Missing bulk_discount_price_5 Column Schema Cache Exception
     if (
       result.error &&
       (result.error.message?.includes('bulk_discount_price_5') ||
@@ -640,7 +660,8 @@ export default function AddProductModal({
       return;
     }
 
-    const finalSku = sku.trim() || `PYJ-${Math.floor(100000 + Math.random() * 900000)}`;
+    const finalSku =
+      sku.trim() || `PYJ-${Date.now().toString().slice(-4)}${Math.floor(100 + Math.random() * 900)}`;
     const activeColors = colors.filter((c) => c.colorName.trim() !== '');
 
     if (activeColors.length === 0) {
