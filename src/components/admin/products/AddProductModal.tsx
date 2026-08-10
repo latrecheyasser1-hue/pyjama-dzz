@@ -74,6 +74,71 @@ export function fileToBase64(file: File): Promise<string> {
   });
 }
 
+export const COLOR_NAME_TO_HEX_MAP: Record<string, string> = {
+  'بيج': '#E5D3B3',
+  'beige': '#E5D3B3',
+  'أسود': '#000000',
+  'noire': '#000000',
+  'noir': '#000000',
+  'black': '#000000',
+  'أبيض': '#FFFFFF',
+  'blanc': '#FFFFFF',
+  'white': '#FFFFFF',
+  'أحمر': '#DC2626',
+  'rouge': '#DC2626',
+  'red': '#DC2626',
+  'وردي': '#F472B6',
+  'rose': '#F472B6',
+  'pink': '#F472B6',
+  'أزرق': '#2563EB',
+  'bleu': '#2563EB',
+  'blue': '#2563EB',
+  'كحلي': '#1E3A8A',
+  'marine': '#1E3A8A',
+  'اخضر': '#16A34A',
+  'أخضر': '#16A34A',
+  'vert': '#16A34A',
+  'green': '#16A34A',
+  'زيتي': '#4D7C0F',
+  'khaki': '#4D7C0F',
+  'رمادي': '#6B7280',
+  'gris': '#6B7280',
+  'grey': '#6B7280',
+  'gray': '#6B7280',
+  'بني': '#78350F',
+  'marron': '#78350F',
+  'brown': '#78350F',
+  'بنفسجي': '#7C3AED',
+  'violet': '#7C3AED',
+  'purple': '#7C3AED',
+  'أصفر': '#EAB308',
+  'jaune': '#EAB308',
+  'yellow': '#EAB308',
+  'برتقالي': '#F97316',
+  'orange': '#F97316',
+  'عنابي': '#800020',
+  'bordeaux': '#800020',
+  'burgundy': '#800020',
+  'ذهبي': '#D4AF37',
+  'gold': '#D4AF37',
+  'فضي': '#C0C0C0',
+  'argent': '#C0C0C0',
+  'silver': '#C0C0C0',
+};
+
+export function getEffectiveColorHex(colorName?: string, hexValue?: string): string {
+  if (hexValue && hexValue.trim() !== '' && hexValue.toLowerCase() !== '#ffffff') {
+    return hexValue.trim();
+  }
+  if (colorName && colorName.trim() !== '') {
+    const cleanName = colorName.trim().toLowerCase();
+    if (COLOR_NAME_TO_HEX_MAP[cleanName]) {
+      return COLOR_NAME_TO_HEX_MAP[cleanName];
+    }
+  }
+  return hexValue && hexValue.trim() !== '' ? hexValue.trim() : '#ffffff';
+}
+
 // Supabase Storage Image Binary Upload Handler with Base64 Fallback
 export async function uploadImageToSupabase(file: File): Promise<string> {
   try {
@@ -586,7 +651,17 @@ export default function AddProductModal({
 
   const handleUpdateColor = (id: string, field: keyof ColorInputItem, value: any) => {
     setColors((prev) =>
-      prev.map((c) => (c.id === id ? { ...c, [field]: value } : c))
+      prev.map((c) => {
+        if (c.id !== id) return c;
+        const updated = { ...c, [field]: value };
+        if (field === 'colorName' && (c.colorHex === '#ffffff' || !c.colorHex)) {
+          const inferred = getEffectiveColorHex(value, c.colorHex);
+          if (inferred !== '#ffffff') {
+            updated.colorHex = inferred;
+          }
+        }
+        return updated;
+      })
     );
   };
 
@@ -1679,7 +1754,8 @@ export default function AddProductModal({
             <div className="space-y-6">
               {colors.map((colorItem, index) => {
                 const totalSerieItems = getSerieTotalItems(colorItem);
-                const isCustomColorHex = colorItem.colorHex && colorItem.colorHex !== '#ffffff';
+                const effectiveHex = getEffectiveColorHex(colorItem.colorName, colorItem.colorHex);
+                const isCustomColorHex = effectiveHex !== '#ffffff';
 
                 return (
                   <div
@@ -1695,12 +1771,11 @@ export default function AddProductModal({
 
                         {/* Dynamic Color Circle Badge Preview */}
                         <div
-                          className="w-8 h-8 rounded-full border-2 shadow-sm shrink-0 transition-transform hover:scale-110 flex items-center justify-center"
+                          className="w-8 h-8 rounded-full border border-gray-300 shadow-sm shrink-0 transition-transform hover:scale-110 flex items-center justify-center overflow-hidden"
                           style={{
-                            backgroundColor: isCustomColorHex ? colorItem.colorHex : 'transparent',
-                            borderColor: isCustomColorHex ? '#ffffff' : '#d1d5db',
+                            backgroundColor: effectiveHex,
                           }}
-                          title={isCustomColorHex ? `الدرجة المحددة: ${colorItem.colorHex}` : 'لم يتم تحديد درجة اللون بعد'}
+                          title={`الدرجة المحددة: ${effectiveHex}`}
                         >
                           {!isCustomColorHex && <Palette className="w-4 h-4 text-gray-400" />}
                         </div>
@@ -1719,7 +1794,7 @@ export default function AddProductModal({
                         <div className="flex items-center gap-1.5 shrink-0">
                           <input
                             type="color"
-                            value={colorItem.colorHex || '#ffffff'}
+                            value={effectiveHex}
                             onChange={(e) => handleUpdateColor(colorItem.id, 'colorHex', e.target.value)}
                             className="w-9 h-9 p-0.5 rounded-xl border border-gray-200 cursor-pointer bg-white"
                             title="عجلة الألوان"
