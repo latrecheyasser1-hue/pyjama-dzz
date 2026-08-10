@@ -1,21 +1,22 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Truck, Store, Building2, Search, Plus, PackageCheck, AlertTriangle } from 'lucide-react';
+import { Search, Plus, PackageCheck, AlertTriangle } from 'lucide-react';
 import { Product, StockType } from '@/types/admin';
 
 interface InventoryManagerProps {
   products: Product[];
+  activeStockTab?: StockType;
   onUpdateStock: (variantId: string, stockType: StockType, newQuantity: number) => void;
   onAddProduct: () => void;
 }
 
 export default function InventoryManager({
   products = [],
+  activeStockTab = 'DELIVERY',
   onUpdateStock,
   onAddProduct,
 }: InventoryManagerProps) {
-  const [activeStockTab, setActiveStockTab] = useState<StockType>('DELIVERY');
   const [searchQuery, setSearchQuery] = useState('');
 
   const filteredProducts = products.filter((p) =>
@@ -23,110 +24,70 @@ export default function InventoryManager({
     p.sku.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const getStockTabLabel = (type: StockType) => {
+    switch (type) {
+      case 'DELIVERY':
+        return 'مخزون التوصيل (Delivery Stock)';
+      case 'STORE':
+        return 'مخزون المحل (Store / POS Stock)';
+      case 'WHOLESALE':
+        return 'مخزون الجملة (Wholesale Stock)';
+      default:
+        return 'المخزون العامة';
+    }
+  };
+
   return (
     <div className="space-y-6 dir-rtl" dir="rtl">
-      {/* Top Header & Stock Pool Tabs */}
-      <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-card space-y-6">
+      {/* Clean Top Header: Title & Burgundy Action Button */}
+      <div className="bg-white rounded-3xl p-6 border border-gray-100 shadow-card space-y-4">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-bold text-pyjama-charcoal">إدارة المخزون والمنتجات (Inventory)</h2>
+            <div className="flex items-center gap-2">
+              <h2 className="text-xl font-bold text-pyjama-charcoal">
+                {getStockTabLabel(activeStockTab)}
+              </h2>
+              <span className="px-3 py-1 bg-pyjama-pink-soft text-[#8A2B43] rounded-full text-xs font-bold font-mono">
+                {activeStockTab}
+              </span>
+            </div>
             <p className="text-xs text-gray-500 mt-1">
-              متابعة المخزون المستقل في المستودعات الثلاثة (التوصيل، المحل، الجملة)
+              إدارة كميات المنتجات والمقاسات والألوان الخاصة بقسم {getStockTabLabel(activeStockTab)}
             </p>
           </div>
 
           <button
             onClick={onAddProduct}
-            className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-[#8A2B43] hover:bg-[#7A1C32] text-white text-xs font-bold shadow-md transition-all"
+            className="flex items-center gap-2 px-5 py-2.5 rounded-2xl bg-[#8A2B43] hover:bg-[#7A1C32] text-white text-xs font-bold shadow-md transition-all shrink-0"
           >
             <Plus className="w-4 h-4" />
             <span>إضافة منتج جديد (New Product)</span>
           </button>
         </div>
 
-        {/* 3 Isolated Stock Tabs */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2">
-          <button
-            onClick={() => setActiveStockTab('DELIVERY')}
-            className={`p-4 rounded-2xl border transition-all flex items-center justify-between ${
-              activeStockTab === 'DELIVERY'
-                ? 'bg-[#8A2B43] text-white border-[#8A2B43] shadow-lg scale-[1.02]'
-                : 'bg-pyjama-cream/60 border-gray-200 text-gray-700 hover:bg-pyjama-cream'
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <div className={`p-2.5 rounded-xl ${activeStockTab === 'DELIVERY' ? 'bg-[#E8A5B8] text-[#7A1C32]' : 'bg-white text-[#8A2B43]'}`}>
-                <Truck className="w-5 h-5" />
-              </div>
-              <div className="text-right">
-                <span className="block text-xs font-bold">مخزون التوصيل</span>
-                <span className="text-[10px] opacity-80">Delivery Stock</span>
-              </div>
-            </div>
-          </button>
-
-          <button
-            onClick={() => setActiveStockTab('STORE')}
-            className={`p-4 rounded-2xl border transition-all flex items-center justify-between ${
-              activeStockTab === 'STORE'
-                ? 'bg-[#8A2B43] text-white border-[#8A2B43] shadow-lg scale-[1.02]'
-                : 'bg-pyjama-cream/60 border-gray-200 text-gray-700 hover:bg-pyjama-cream'
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <div className={`p-2.5 rounded-xl ${activeStockTab === 'STORE' ? 'bg-[#E8A5B8] text-[#7A1C32]' : 'bg-white text-[#8A2B43]'}`}>
-                <Store className="w-5 h-5" />
-              </div>
-              <div className="text-right">
-                <span className="block text-xs font-bold">مخزون المحل (POS)</span>
-                <span className="text-[10px] opacity-80">Store Stock</span>
-              </div>
-            </div>
-          </button>
-
-          <button
-            onClick={() => setActiveStockTab('WHOLESALE')}
-            className={`p-4 rounded-2xl border transition-all flex items-center justify-between ${
-              activeStockTab === 'WHOLESALE'
-                ? 'bg-[#8A2B43] text-white border-[#8A2B43] shadow-lg scale-[1.02]'
-                : 'bg-pyjama-cream/60 border-gray-200 text-gray-700 hover:bg-pyjama-cream'
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              <div className={`p-2.5 rounded-xl ${activeStockTab === 'WHOLESALE' ? 'bg-[#E8A5B8] text-[#7A1C32]' : 'bg-white text-[#8A2B43]'}`}>
-                <Building2 className="w-5 h-5" />
-              </div>
-              <div className="text-right">
-                <span className="block text-xs font-bold">مخزون الجملة</span>
-                <span className="text-[10px] opacity-80">Wholesale Stock</span>
-              </div>
-            </div>
-          </button>
-        </div>
-
         {/* Search Bar */}
-        <div className="relative">
-          <Search className="w-4 h-4 text-gray-400 absolute right-4 top-3.5" />
+        <div className="relative pt-2">
+          <Search className="w-4 h-4 text-gray-400 absolute right-4 top-5" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="بحث بالاسم أو رمز SKU..."
-            className="w-full pr-11 pl-4 py-2.5 bg-pyjama-cream/40 rounded-xl border border-gray-200 text-xs focus:outline-none focus:border-[#8A2B43] transition-all"
+            className="w-full pr-11 pl-4 py-2.5 bg-pyjama-cream/40 rounded-xl border border-gray-200 text-xs focus:outline-none focus:border-[#8A2B43] transition-all font-sans"
           />
         </div>
       </div>
 
-      {/* Products & Variants Table OR Clean Empty State */}
+      {/* Products & Variants Table OR Clean Pyjama DZ Empty State */}
       {filteredProducts.length === 0 ? (
         <div className="bg-white rounded-3xl p-12 text-center border border-gray-100 shadow-card space-y-4">
           <div className="w-16 h-16 rounded-3xl bg-pyjama-cream border border-pyjama-pink/40 text-[#8A2B43] flex items-center justify-center mx-auto shadow-sm">
             <PackageCheck className="w-8 h-8" />
           </div>
           <div className="space-y-1">
-            <h3 className="text-lg font-bold text-pyjama-charcoal">لا توجد منتجات حالياً</h3>
+            <h3 className="text-lg font-bold text-pyjama-charcoal">لا توجد منتجات حالياً في {getStockTabLabel(activeStockTab)}</h3>
             <p className="text-xs text-gray-500 max-w-sm mx-auto">
-              قاعدة بيانات المنتجات والمخزون فارغة. اضغط على زر "إضافة منتج جديد" للبدء في إضافة منتجات المتجر.
+              قاعدة بيانات المنتجات فارغة. اضغط على زر "إضافة منتج جديد" للبدء في إضافة منتجات المتجر.
             </p>
           </div>
           <button
@@ -148,11 +109,9 @@ export default function InventoryManager({
                   <th className="py-4 px-5">سعر التكلفة</th>
                   <th className="py-4 px-5">سعر البيع</th>
                   <th className="py-4 px-5">
-                    المخزون المحدد (
-                    {activeStockTab === 'DELIVERY' ? 'مخزون التوصيل' : activeStockTab === 'STORE' ? 'مخزون المحل' : 'مخزون الجملة'}
-                    )
+                    المخزون الحالي ({activeStockTab === 'DELIVERY' ? 'التوصيل' : activeStockTab === 'STORE' ? 'المحل' : 'الجملة'})
                   </th>
-                  <th className="py-4 px-5 text-center">العمليات</th>
+                  <th className="py-4 px-5 text-center">العمليات السريعة</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-100 font-sans">

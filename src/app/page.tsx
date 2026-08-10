@@ -198,6 +198,7 @@ export default function MasterAdminPage() {
   const [isLocked, setIsLocked] = useState<boolean>(true);
   const [isPinModalOpen, setIsPinModalOpen] = useState<boolean>(false);
   const [activeSection, setActiveSection] = useState<DashboardSection>('NEW_ORDERS');
+  const [activeStockTab, setActiveStockTab] = useState<StockType>('DELIVERY');
   const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
 
   // Entities State
@@ -345,6 +346,8 @@ export default function MasterAdminPage() {
       <AdminSidebar
         activeSection={activeSection}
         onSelectSection={setActiveSection}
+        activeStockTab={activeStockTab}
+        onSelectStockTab={setActiveStockTab}
         unconfirmedCount={unconfirmedOrders.length}
         isMobileOpen={isMobileSidebarOpen}
         onCloseMobile={() => setIsMobileSidebarOpen(false)}
@@ -365,7 +368,7 @@ export default function MasterAdminPage() {
             <div>
               <h1 className="text-lg sm:text-xl font-black text-pyjama-charcoal">
                 {activeSection === 'NEW_ORDERS' && 'الطلبيات الجديدة الواردة (Retail & Wholesale)'}
-                {activeSection === 'INVENTORY' && 'المخزون والمستودعات الثلاثة (Inventory)'}
+                {activeSection === 'INVENTORY' && `المخزون والمستودعات • ${activeStockTab === 'DELIVERY' ? 'مخزون التوصيل' : activeStockTab === 'STORE' ? 'مخزون المحل' : 'مخزون الجملة'}`}
                 {activeSection === 'CATEGORIES' && 'الأقسام والتصنيفات (Categories)'}
                 {activeSection === 'SUPPLIERS' && 'إدارة الموردين والورشات (Suppliers)'}
                 {activeSection === 'CUSTOMERS' && 'تصنيف الزبائن الجزائريين (Customer Scoring)'}
@@ -393,6 +396,7 @@ export default function MasterAdminPage() {
         {activeSection === 'INVENTORY' && (
           <InventoryManager
             products={products}
+            activeStockTab={activeStockTab}
             onUpdateStock={handleUpdateStock}
             onAddProduct={() => setActiveSection('SETTINGS')}
           />

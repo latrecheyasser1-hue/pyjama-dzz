@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import {
   BellRing,
   Package,
@@ -11,13 +11,20 @@ import {
   TrendingUp,
   History,
   Settings,
+  ChevronDown,
+  ChevronUp,
+  Truck,
+  Store,
+  Building2,
   X
 } from 'lucide-react';
-import { DashboardSection } from '@/types/admin';
+import { DashboardSection, StockType } from '@/types/admin';
 
 interface AdminSidebarProps {
   activeSection: DashboardSection;
   onSelectSection: (section: DashboardSection) => void;
+  activeStockTab: StockType;
+  onSelectStockTab: (stockTab: StockType) => void;
   unconfirmedCount: number;
   isMobileOpen: boolean;
   onCloseMobile: () => void;
@@ -26,10 +33,14 @@ interface AdminSidebarProps {
 export default function AdminSidebar({
   activeSection,
   onSelectSection,
+  activeStockTab,
+  onSelectStockTab,
   unconfirmedCount,
   isMobileOpen,
   onCloseMobile,
 }: AdminSidebarProps) {
+  const [isInventoryExpanded, setIsInventoryExpanded] = useState(true);
+
   const menuItems = [
     {
       id: 'NEW_ORDERS' as DashboardSection,
@@ -42,6 +53,7 @@ export default function AdminSidebar({
       id: 'INVENTORY' as DashboardSection,
       labelAr: 'المخزون والمنتجات',
       icon: Package,
+      hasDropdown: true,
     },
     {
       id: 'CATEGORIES' as DashboardSection,
@@ -78,6 +90,12 @@ export default function AdminSidebar({
       labelAr: 'الإعدادات الشاملة',
       icon: Settings,
     },
+  ];
+
+  const inventorySubItems = [
+    { id: 'DELIVERY' as StockType, labelAr: 'مخزون التوصيل (Delivery)', icon: Truck },
+    { id: 'STORE' as StockType, labelAr: 'مخزون المحل (Store / POS)', icon: Store },
+    { id: 'WHOLESALE' as StockType, labelAr: 'مخزون الجملة (Wholesale)', icon: Building2 },
   ];
 
   return (
@@ -125,6 +143,72 @@ export default function AdminSidebar({
               const Icon = item.icon;
               const isActive = activeSection === item.id;
 
+              if (item.hasDropdown) {
+                return (
+                  <div key={item.id} className="space-y-1">
+                    <button
+                      onClick={() => {
+                        onSelectSection('INVENTORY');
+                        setIsInventoryExpanded(!isInventoryExpanded);
+                      }}
+                      className={`w-full flex items-center justify-between px-4 py-3 rounded-2xl text-xs font-bold transition-all group ${
+                        isActive
+                          ? 'bg-[#8A2B43] text-white shadow-lg border border-[#E8A5B8]/30'
+                          : 'text-white/80 hover:bg-white/10 hover:text-white'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <div
+                          className={`p-2 rounded-xl transition-all ${
+                            isActive
+                              ? 'bg-[#E8A5B8] text-[#7A1C32]'
+                              : 'bg-white/10 text-white/80 group-hover:text-white'
+                          }`}
+                        >
+                          <Icon className="w-4 h-4" />
+                        </div>
+                        <span className="font-sans">{item.labelAr}</span>
+                      </div>
+
+                      {isInventoryExpanded ? (
+                        <ChevronUp className="w-4 h-4 text-[#E8A5B8]" />
+                      ) : (
+                        <ChevronDown className="w-4 h-4 text-white/50" />
+                      )}
+                    </button>
+
+                    {/* Collapsible Sub-menu */}
+                    {isInventoryExpanded && (
+                      <div className="mr-5 pr-3 border-r-2 border-[#E8A5B8]/30 space-y-1 py-1">
+                        {inventorySubItems.map((sub) => {
+                          const SubIcon = sub.icon;
+                          const isSubActive = isActive && activeStockTab === sub.id;
+
+                          return (
+                            <button
+                              key={sub.id}
+                              onClick={() => {
+                                onSelectSection('INVENTORY');
+                                onSelectStockTab(sub.id);
+                                onCloseMobile();
+                              }}
+                              className={`w-full flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl text-[11px] font-bold transition-all ${
+                                isSubActive
+                                  ? 'bg-[#E8A5B8] text-[#7A1C32] shadow-md font-black scale-[1.02]'
+                                  : 'text-white/70 hover:bg-white/10 hover:text-white'
+                              }`}
+                            >
+                              <SubIcon className={`w-3.5 h-3.5 ${isSubActive ? 'text-[#7A1C32]' : 'text-[#E8A5B8]'}`} />
+                              <span>{sub.labelAr}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                );
+              }
+
               return (
                 <button
                   key={item.id}
@@ -151,7 +235,7 @@ export default function AdminSidebar({
                     <span className="font-sans">{item.labelAr}</span>
                   </div>
 
-                  {item.badge !== null && (
+                  {item.badge !== null && item.badge !== undefined && (
                     <span
                       className={`px-2.5 py-0.5 rounded-full text-[11px] font-mono font-bold text-[#7A1C32] bg-[#E8A5B8] shadow-sm ${
                         item.pulse ? 'animate-pulse' : ''
