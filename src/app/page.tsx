@@ -301,11 +301,22 @@ export default function MasterAdminPage() {
               }))
           : [];
 
+        const colorMap = new Map<string, string | undefined>();
+        if (varData) {
+          varData.filter((v: any) => String(v.product_id) === String(p.id)).forEach((v: any) => {
+            const col = v.color_name || v.color;
+            const img = v.color_image_url || v.imageUrl;
+            if (col && img && !colorMap.has(col)) {
+              colorMap.set(col, img);
+            }
+          });
+        }
+
         const colorsSet = new Set<string>();
         pVariants.forEach((v) => colorsSet.add(v.color));
         const colors = Array.from(colorsSet).map((cName) => ({
           colorName: cName,
-          imageUrl: p.image_url || undefined,
+          imageUrl: colorMap.get(cName) || p.image_url || undefined,
         }));
 
         const sizesSet = new Set<string>();

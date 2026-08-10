@@ -61,6 +61,116 @@ const sortVariantsAscending = (vars: ProductVariant[]): ProductVariant[] => {
   });
 };
 
+// Interactive Touch/Click Swipe Carousel Subcomponent for Product Thumbnail
+function ProductCardImageCarousel({ product }: { product: Product }) {
+  const images: string[] = [];
+
+  if (product.imageUrl) images.push(product.imageUrl);
+
+  if (product.colors) {
+    product.colors.forEach((c) => {
+      if (c.imageUrl && !images.includes(c.imageUrl)) {
+        images.push(c.imageUrl);
+      }
+    });
+  }
+
+  if (product.variants) {
+    product.variants.forEach((v: any) => {
+      const img = v.color_image_url || v.colorImageUrl || v.imageUrl;
+      if (img && !images.includes(img)) {
+        images.push(img);
+      }
+    });
+  }
+
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [touchStartX, setTouchStartX] = useState<number | null>(null);
+
+  if (images.length === 0) {
+    return (
+      <div className="w-20 h-20 rounded-2xl bg-pyjama-cream border border-gray-200 overflow-hidden shrink-0 flex items-center justify-center shadow-inner">
+        <Package className="w-8 h-8 text-[#8A2B43]" />
+      </div>
+    );
+  }
+
+  const handlePrev = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
+  };
+
+  const handleNext = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCurrentIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
+  };
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    setTouchStartX(e.touches[0].clientX);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchStartX === null) return;
+    const touchEndX = e.changedTouches[0].clientX;
+    const diff = touchStartX - touchEndX;
+
+    if (Math.abs(diff) > 25) {
+      if (diff > 0) {
+        setCurrentIndex((prev) => (prev === images.length - 1 ? 0 : prev + 1));
+      } else {
+        setCurrentIndex((prev) => (prev === 0 ? images.length - 1 : prev - 1));
+      }
+    }
+    setTouchStartX(null);
+  };
+
+  return (
+    <div
+      className="relative w-20 h-20 rounded-2xl bg-pyjama-cream border border-gray-200 overflow-hidden shrink-0 shadow-inner group/carousel"
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+    >
+      <img
+        src={images[currentIndex]}
+        alt={product.nameAr}
+        className="w-full h-full object-cover transition-transform duration-300 group-hover/carousel:scale-105"
+      />
+
+      {images.length > 1 && (
+        <>
+          <button
+            type="button"
+            onClick={handlePrev}
+            className="absolute left-0.5 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-black/60 hover:bg-[#8A2B43] text-white flex items-center justify-center opacity-0 group-hover/carousel:opacity-100 transition-opacity z-10 text-[10px] font-bold"
+            title="الصورة السابقة"
+          >
+            ‹
+          </button>
+          <button
+            type="button"
+            onClick={handleNext}
+            className="absolute right-0.5 top-1/2 -translate-y-1/2 w-4 h-4 rounded-full bg-black/60 hover:bg-[#8A2B43] text-white flex items-center justify-center opacity-0 group-hover/carousel:opacity-100 transition-opacity z-10 text-[10px] font-bold"
+            title="الصورة التالية"
+          >
+            ›
+          </button>
+
+          <div className="absolute bottom-1 left-1/2 -translate-x-1/2 flex items-center gap-0.5 z-10">
+            {images.map((_, idx) => (
+              <span
+                key={idx}
+                className={`h-1 rounded-full transition-all ${
+                  idx === currentIndex ? 'w-2 bg-white shadow-xs' : 'w-1 bg-white/50'
+                }`}
+              />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
 // Color Hex Resolver Helper
 const getColorHex = (colorName: string, variant: any): string => {
   if (variant?.color_hex) return variant.color_hex;
@@ -421,17 +531,8 @@ export default function InventoryGrid({
                     <div className="p-5 space-y-4 flex-1">
                       {/* Product Image & Info Header */}
                       <div className="flex items-start gap-4">
-                        <div className="w-20 h-20 rounded-2xl bg-pyjama-cream border border-gray-200 overflow-hidden shrink-0 flex items-center justify-center shadow-inner">
-                          {product.imageUrl ? (
-                            <img
-                              src={product.imageUrl}
-                              alt={product.nameAr}
-                              className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                            />
-                          ) : (
-                            <Package className="w-8 h-8 text-[#8A2B43]" />
-                          )}
-                        </div>
+                        {/* Interactive Touch/Click Swipe Image Carousel */}
+                        <ProductCardImageCarousel product={product} />
 
                         <div className="space-y-1 flex-1 min-w-0">
                           <h4 className="text-sm font-bold text-pyjama-charcoal line-clamp-2 leading-snug">

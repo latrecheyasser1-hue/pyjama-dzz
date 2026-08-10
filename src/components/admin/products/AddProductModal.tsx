@@ -617,6 +617,41 @@ export default function AddProductModal({
     return null;
   };
 
+  // Helper to ensure all image URLs are public Supabase URLs and not local blob: URLs
+  const ensurePublicImageUrls = async (colorItems: ColorInputItem[]): Promise<ColorInputItem[]> => {
+    const updated = await Promise.all(
+      colorItems.map(async (c) => {
+        if (c.imageUrl && (c.imageUrl.startsWith('blob:') || c.imageUrl.startsWith('data:'))) {
+          try {
+            const response = await fetch(c.imageUrl);
+            const blob = await response.blob();
+            const fileExt = blob.type.split('/')[1] || 'jpg';
+            const fileName = `color-${Date.now()}-${Math.random().toString(36).substring(2, 6)}.${fileExt}`;
+            const filePath = `products/${fileName}`;
+
+            let uploadRes = await supabase.storage.from('products').upload(filePath, blob, { upsert: true });
+            let bName = 'products';
+            if (uploadRes.error) {
+              uploadRes = await supabase.storage.from('product-images').upload(filePath, blob, { upsert: true });
+              bName = 'product-images';
+            }
+
+            if (!uploadRes.error && uploadRes.data) {
+              const { data: pData } = supabase.storage.from(bName).getPublicUrl(filePath);
+              if (pData?.publicUrl) {
+                return { ...c, imageUrl: pData.publicUrl };
+              }
+            }
+          } catch (e) {
+            console.warn('Error converting blob URL to public storage URL:', e);
+          }
+        }
+        return c;
+      })
+    );
+    return updated;
+  };
+
   // Ultra-resilient variant upsert helper with fallback strategies for size / size_name schema cache differences
   const insertVariantsWithResilience = async (rows: any[]): Promise<boolean> => {
     if (rows.length === 0) return true;
@@ -815,6 +850,9 @@ export default function AddProductModal({
     setIsSubmitting(true);
 
     try {
+      // Ensure all uploaded image files are converted from blob: URLs to public Supabase Storage URLs
+      const sanitizedColors = await ensurePublicImageUrls(activeColors);
+
       let existingDbVariants: any[] = [];
       if (isEditMode && productToEdit) {
         const { data: dbVars } = await supabase
@@ -825,7 +863,7 @@ export default function AddProductModal({
         if (dbVars) existingDbVariants = dbVars;
       }
 
-      const firstColorTotalItemsInSerie = activeColors[0] ? getSerieTotalItems(activeColors[0]) : 4;
+      const firstColorTotalItemsInSerie = sanitizedColors[0] ? getSerieTotalItems(sanitizedColors[0]) : 4;
 
       const productPayload: Record<string, any> = {
         name: nameAr.trim(),
@@ -833,7 +871,7 @@ export default function AddProductModal({
         category_id: categoryId || null,
         cost_price: Number(costPrice) || 0,
         description: description.trim() || null,
-        image_url: activeColors[0]?.imageUrl || null,
+        image_url: sanitizedColors[0]?.imageUrl || null,
         size_category: sizeCategory,
       };
 
