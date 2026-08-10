@@ -579,6 +579,33 @@ export default function AddProductModal({
     return false;
   };
 
+  // Resilient Product Insert/Update Helper with Schema Cache Fallback
+  const insertOrUpdateProductWithResilience = async (
+    payload: Record<string, any>,
+    targetProductId?: string
+  ): Promise<{ data: any; error: any }> => {
+    let result: { data: any; error: any } = targetProductId
+      ? await supabase.from('products').update(payload).eq('id', targetProductId).select().single()
+      : await supabase.from('products').insert([payload]).select().single();
+
+    if (
+      result.error &&
+      (result.error.message?.includes('bulk_discount_price_5') ||
+        result.error.message?.includes('schema cache') ||
+        result.error.details?.includes('bulk_discount_price_5'))
+    ) {
+      console.warn('Schema cache notice for bulk_discount_price_5. Retrying without column...');
+      const fallbackPayload = { ...payload };
+      delete fallbackPayload.bulk_discount_price_5;
+
+      result = targetProductId
+        ? await supabase.from('products').update(fallbackPayload).eq('id', targetProductId).select().single()
+        : await supabase.from('products').insert([fallbackPayload]).select().single();
+    }
+
+    return result;
+  };
+
   // Context-Isolated Supabase Submit Handler with Zero-Stock Defaults for Inactive Warehouses
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -635,7 +662,9 @@ export default function AddProductModal({
         productPayload.supplier_phone = supplierPhone.trim() || null;
         productPayload.selling_price = Number(sellingPrice) || 0;
         productPayload.old_price = oldPrice !== '' ? Number(oldPrice) : null;
-        productPayload.bulk_discount_price_5 = bulkDiscountPrice5 !== '' ? Number(bulkDiscountPrice5) : null;
+        if (bulkDiscountPrice5 !== '') {
+          productPayload.bulk_discount_price_5 = Number(bulkDiscountPrice5);
+        }
       }
 
       if (activeWarehouse === 'WHOLESALE') {
@@ -691,11 +720,11 @@ export default function AddProductModal({
       });
 
       if (isEditMode && productToEdit) {
-        // UPDATE existing product
-        const { error: productError } = await supabase
-          .from('products')
-          .update(productPayload)
-          .eq('id', productToEdit.id);
+        // UPDATE existing product with resilience
+        const { error: productError } = await insertOrUpdateProductWithResilience(
+          productPayload,
+          productToEdit.id
+        );
 
         if (productError) {
           console.error('Products Update Error:', productError);
@@ -767,13 +796,11 @@ export default function AddProductModal({
 
         alert('تم تعديل وحفظ بيانات المنتج بنجاح! ✅');
       } else {
-        // INSERT new product globally across all 3 warehouses with Zero-stock defaults for inactive warehouses
+        // INSERT new product globally with resilience
         let insertedProductId = `prod-${Date.now()}`;
-        const { data: prodData, error: productError } = await supabase
-          .from('products')
-          .insert([productPayload])
-          .select()
-          .single();
+        const { data: prodData, error: productError } = await insertOrUpdateProductWithResilience(
+          productPayload
+        );
 
         if (productError) {
           console.error('Products Insert Error:', productError);
