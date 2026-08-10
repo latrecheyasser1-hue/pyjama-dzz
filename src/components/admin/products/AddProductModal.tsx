@@ -64,11 +64,50 @@ export const SIZE_CATEGORIES: Record<SizeCategoryKey, { label: string; sizes: st
   },
 };
 
+// Supabase Storage Image Binary Upload Handler (Guarantees permanent public URLs)
+export async function uploadImageToSupabase(file: File): Promise<string> {
+  const fileExt = file.name.split('.').pop() || 'jpg';
+  const fileName = `${Date.now()}_${Math.random().toString(36).substring(2)}.${fileExt}`;
+  const filePath = `products/${fileName}`;
+
+  // 1. Try uploading to 'product-images' bucket first, fallback to 'products'
+  let { error: uploadError } = await supabase.storage
+    .from('product-images')
+    .upload(filePath, file, { cacheControl: '3600', upsert: true });
+
+  let bucketName = 'product-images';
+
+  if (uploadError) {
+    console.warn('Fallback: Uploading to products bucket...');
+    const retry = await supabase.storage
+      .from('products')
+      .upload(filePath, file, { cacheControl: '3600', upsert: true });
+
+    if (retry.error) {
+      console.error('Storage Upload Error:', retry.error);
+      throw retry.error;
+    }
+    bucketName = 'products';
+  }
+
+  // 2. Get permanent Public URL
+  const { data } = supabase.storage
+    .from(bucketName)
+    .getPublicUrl(filePath);
+
+  if (!data?.publicUrl) {
+    throw new Error('فشل الحصول على الرابط العام للصورة من Supabase Storage');
+  }
+
+  return data.publicUrl;
+}
+
 interface ColorInputItem {
   id: string;
   colorName: string;
   colorHex: string;
   imageUrl: string;
+  imageFile?: File; // Preserves raw binary File object for pre-submit upload safety
   // Warehouse Stock Quantity Maps
   deliveryStocks: Record<string, number>;
   storeStocks: Record<string, number>;
@@ -511,33 +550,24 @@ export default function AddProductModal({
     }
   };
 
-  // Direct Image File Upload Handler
+  // Direct Image File Upload Handler with Instant Preview and Asynchronous Storage Upload
   const handleImageFileChange = async (colorId: string, file: File) => {
     if (!file) return;
 
+    // 1. Instant local preview with File preservation in state
     const localUrl = URL.createObjectURL(file);
-    handleUpdateColor(colorId, 'imageUrl', localUrl);
+    setColors((prev) =>
+      prev.map((c) => (c.id === colorId ? { ...c, imageUrl: localUrl, imageFile: file } : c))
+    );
 
+    // 2. Asynchronous binary upload to Supabase Storage
     try {
-      const fileExt = file.name.split('.').pop() || 'jpg';
-      const fileName = `color-${Date.now()}-${Math.random().toString(36).substring(2, 6)}.${fileExt}`;
-      const filePath = `products/${fileName}`;
-
-      const { data, error } = await supabase.storage
-        .from('products')
-        .upload(filePath, file);
-
-      if (!error && data) {
-        const { data: publicData } = supabase.storage
-          .from('products')
-          .getPublicUrl(filePath);
-
-        if (publicData?.publicUrl) {
-          handleUpdateColor(colorId, 'imageUrl', publicData.publicUrl);
-        }
-      }
+      const publicUrl = await uploadImageToSupabase(file);
+      setColors((prev) =>
+        prev.map((c) => (c.id === colorId ? { ...c, imageUrl: publicUrl } : c))
+      );
     } catch (err) {
-      console.warn('Storage upload notice (retaining local preview URL):', err);
+      console.warn('Asynchronous storage upload notice (retaining preview for pre-submit retry):', err);
     }
   };
 
@@ -621,27 +651,25 @@ export default function AddProductModal({
   const ensurePublicImageUrls = async (colorItems: ColorInputItem[]): Promise<ColorInputItem[]> => {
     const updated = await Promise.all(
       colorItems.map(async (c) => {
+        // 1. If raw binary File object exists in state, upload to Supabase storage
+        if (c.imageFile && (c.imageUrl.startsWith('blob:') || c.imageUrl.startsWith('data:'))) {
+          try {
+            const publicUrl = await uploadImageToSupabase(c.imageFile);
+            return { ...c, imageUrl: publicUrl };
+          } catch (e) {
+            console.warn('Error uploading c.imageFile on submit:', e);
+          }
+        }
+
+        // 2. Fallback: Convert blob URL to File and upload to Supabase storage
         if (c.imageUrl && (c.imageUrl.startsWith('blob:') || c.imageUrl.startsWith('data:'))) {
           try {
             const response = await fetch(c.imageUrl);
             const blob = await response.blob();
             const fileExt = blob.type.split('/')[1] || 'jpg';
-            const fileName = `color-${Date.now()}-${Math.random().toString(36).substring(2, 6)}.${fileExt}`;
-            const filePath = `products/${fileName}`;
-
-            let uploadRes = await supabase.storage.from('products').upload(filePath, blob, { upsert: true });
-            let bName = 'products';
-            if (uploadRes.error) {
-              uploadRes = await supabase.storage.from('product-images').upload(filePath, blob, { upsert: true });
-              bName = 'product-images';
-            }
-
-            if (!uploadRes.error && uploadRes.data) {
-              const { data: pData } = supabase.storage.from(bName).getPublicUrl(filePath);
-              if (pData?.publicUrl) {
-                return { ...c, imageUrl: pData.publicUrl };
-              }
-            }
+            const file = new File([blob], `product_${Date.now()}.${fileExt}`, { type: blob.type || 'image/jpeg' });
+            const publicUrl = await uploadImageToSupabase(file);
+            return { ...c, imageUrl: publicUrl };
           } catch (e) {
             console.warn('Error converting blob URL to public storage URL:', e);
           }
