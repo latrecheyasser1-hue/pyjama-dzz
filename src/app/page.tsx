@@ -304,22 +304,36 @@ export default function MasterAdminPage() {
         .in('product_id', prodIds);
 
       const mappedProducts: Product[] = prodData.map((p: any) => {
+        let descColorMap: Record<string, string> = {};
+        if (p.description) {
+          const match = p.description.match(/<!--COLOR_IMAGES:([\s\S]*?)-->/);
+          if (match && match[1]) {
+            try {
+              descColorMap = JSON.parse(match[1]);
+            } catch (e) {}
+          }
+        }
+
         const pVariants = varData
           ? varData
               .filter((v: any) => String(v.product_id) === String(p.id))
-              .map((v: any) => ({
-                id: String(v.id),
-                productId: String(v.product_id),
-                size: v.size || v.size_name || 'Standard',
-                color: v.color_name || v.color || 'أساسي',
-                color_image_url: v.color_image_url || v.colorImageUrl || undefined,
-                colorImageUrl: v.color_image_url || v.colorImageUrl || undefined,
-                deliveryStock: Number(v.delivery_stock) || 0,
-                storeStock: Number(v.store_stock) || 0,
-                wholesaleStock: Number(v.wholesale_stock) || 0,
-                serieComposition: v.serie_composition || undefined,
-                wholesaleSeriesQty: v.wholesale_series_qty !== undefined ? Number(v.wholesale_series_qty) : undefined,
-              }))
+              .map((v: any) => {
+                const col = v.color_name || v.color || 'أساسي';
+                const img = v.color_image_url || v.colorImageUrl || descColorMap[col] || undefined;
+                return {
+                  id: String(v.id),
+                  productId: String(v.product_id),
+                  size: v.size || v.size_name || 'Standard',
+                  color: col,
+                  color_image_url: img,
+                  colorImageUrl: img,
+                  deliveryStock: Number(v.delivery_stock) || 0,
+                  storeStock: Number(v.store_stock) || 0,
+                  wholesaleStock: Number(v.wholesale_stock) || 0,
+                  serieComposition: v.serie_composition || undefined,
+                  wholesaleSeriesQty: v.wholesale_series_qty !== undefined ? Number(v.wholesale_series_qty) : undefined,
+                };
+              })
           : [];
 
         const colorMap = new Map<string, string | undefined>();
@@ -337,7 +351,7 @@ export default function MasterAdminPage() {
         pVariants.forEach((v) => colorsSet.add(v.color));
         const colors = Array.from(colorsSet).map((cName) => ({
           colorName: cName,
-          imageUrl: colorMap.get(cName) || undefined, // STRICTLY SPECIFIC COLOR IMAGE ONLY - DO NOT FALLBACK TO p.image_url!
+          imageUrl: colorMap.get(cName) || descColorMap[cName] || undefined,
         }));
 
         const sizesSet = new Set<string>();

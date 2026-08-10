@@ -304,7 +304,22 @@ export default function AddProductModal({
       setSuperGrosPrice(productToEdit.superGrosPrice ?? '');
       setMinWholesaleSeries(productToEdit.minWholesaleSeries ?? 1);
       setSuperGrosThreshold(productToEdit.superGrosThreshold ?? 10);
-      setDescription(productToEdit.description || '');
+      const rawDesc = productToEdit.description || '';
+      const cleanDisplayDesc = rawDesc.replace(/<!--COLOR_IMAGES:[\s\S]*?-->/g, '').trim();
+      setDescription(cleanDisplayDesc);
+
+      // Extract colorImageMap from description metadata if present
+      let descColorMap: Record<string, string> = {};
+      if (productToEdit.description) {
+        const match = productToEdit.description.match(/<!--COLOR_IMAGES:([\s\S]*?)-->/);
+        if (match && match[1]) {
+          try {
+            descColorMap = JSON.parse(match[1]);
+          } catch (e) {
+            console.warn('Notice parsing descColorMap:', e);
+          }
+        }
+      }
 
       // Infer or load size category accurately from product data
       let detectedCat: SizeCategoryKey =
@@ -392,13 +407,14 @@ export default function AddProductModal({
             }
           });
 
-          // Extract color_image_url from variant rows or color object in prop
+          // Extract color_image_url from variant rows, metadata map, or color object in prop
           const varWithImg = vars.find((v) => v.color_image_url || v.colorImageUrl);
           const colorPropObj = productToEdit.colors?.find((c) => c.colorName === colName);
 
           const savedImage =
             varWithImg?.color_image_url ||
             varWithImg?.colorImageUrl ||
+            descColorMap[colName] ||
             colorPropObj?.imageUrl ||
             '';
 
@@ -406,7 +422,7 @@ export default function AddProductModal({
             id: `c-edit-${idx}-${Date.now()}`,
             colorName: colName,
             colorHex: '#ffffff',
-            imageUrl: savedImage, // 100% PERSISTENT SAVED IMAGE FROM DB!
+            imageUrl: savedImage, // 100% PERSISTENT SAVED IMAGE FROM DB AND METADATA!
             deliveryStocks: delStocks,
             storeStocks: storeStocks,
             wholesaleStocks: wsStocks,
@@ -935,12 +951,25 @@ export default function AddProductModal({
       // Primary product image: first non-empty color image or null
       const primaryProductImg = sanitizedColors.find((c) => c.imageUrl && c.imageUrl.trim() !== '')?.imageUrl || null;
 
+      // Encode per-color images into description metadata tag as an unbeatable fallback store
+      const colorImageMap: Record<string, string> = {};
+      sanitizedColors.forEach((c) => {
+        if (c.colorName.trim() && c.imageUrl && c.imageUrl.trim() !== '') {
+          colorImageMap[c.colorName.trim()] = c.imageUrl.trim();
+        }
+      });
+
+      let finalDesc = description.replace(/<!--COLOR_IMAGES:[\s\S]*?-->/g, '').trim();
+      if (Object.keys(colorImageMap).length > 0) {
+        finalDesc = `${finalDesc}\n<!--COLOR_IMAGES:${JSON.stringify(colorImageMap)}-->`.trim();
+      }
+
       const productPayload: Record<string, any> = {
         name: nameAr.trim(),
         sku: finalSku,
         category_id: categoryId || null,
         cost_price: Number(costPrice) || 0,
-        description: description.trim() || null,
+        description: finalDesc || null,
         image_url: primaryProductImg,
         size_category: sizeCategory,
       };
