@@ -42,8 +42,10 @@ export interface Category {
   name: string;
   nameAr?: string;
   nameFr?: string;
-  slug: string;
+  slug?: string;
+  imageUrl?: string;
   coverImageUrl?: string;
+  isActive?: boolean;
   createdAt?: string;
 }
 

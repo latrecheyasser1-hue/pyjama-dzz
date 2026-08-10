@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Grid, Plus, Trash2, Folder, Image as ImageIcon } from 'lucide-react';
+import { Grid, Plus, Trash2, Folder } from 'lucide-react';
 import { Category, Product } from '@/types/admin';
 
 interface CategoriesManagerProps {
@@ -34,8 +34,9 @@ export default function CategoriesManager({
     }
   };
 
-  // Helper to find automatic cover image from first product in category
+  // Helper to find automatic cover image from category's own image or first product in category
   const getCategoryCover = (cat: Category) => {
+    if (cat.imageUrl) return cat.imageUrl;
     if (cat.coverImageUrl) return cat.coverImageUrl;
     const categoryProduct = products.find(
       (p) => p.categoryId === cat.id && p.imageUrl
@@ -158,9 +159,11 @@ export default function CategoriesManager({
                     <h4 className="text-sm font-bold text-pyjama-charcoal truncate">
                       {categoryName}
                     </h4>
-                    <p className="text-[11px] text-gray-400 font-mono mt-0.5 truncate">
-                      Slug: {cat.slug}
-                    </p>
+                    {cat.slug && (
+                      <p className="text-[11px] text-gray-400 font-mono mt-0.5 truncate">
+                        Slug: {cat.slug}
+                      </p>
+                    )}
                     <span className="inline-block mt-1 text-[10px] text-[#8A2B43] font-bold bg-pyjama-pink-soft px-2 py-0.5 rounded-md">
                       {products.filter((p) => p.categoryId === cat.id).length} منتج
                     </span>
