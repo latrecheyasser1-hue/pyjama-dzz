@@ -9,12 +9,8 @@ import {
   Phone,
   MapPin,
   Package,
-  Printer,
   Check,
   XCircle,
-  CreditCard,
-  Tag,
-  DollarSign,
 } from 'lucide-react';
 import { DetailedOrder } from '@/types/orders';
 
@@ -34,10 +30,6 @@ export default function OrderDetailsModal({
   if (!order) return null;
 
   const isWholesale = order.orderType === 'WHOLESALE';
-
-  const handlePrint = () => {
-    window.print();
-  };
 
   const getPaymentStatusBadge = (status?: string) => {
     switch (status) {
@@ -230,17 +222,17 @@ export default function OrderDetailsModal({
           </div>
         </div>
 
-        {/* Quick Action Bar */}
+        {/* Action Bar (Confirm & Cancel Buttons) */}
         <div className="flex items-center gap-3 pt-2">
           <button
             onClick={() => {
               onConfirmOrder(order.id);
               onClose();
             }}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-[#8A2B43] hover:bg-[#7A1C32] text-white text-xs font-bold shadow-md transition-all"
+            className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-[#8A2B43] hover:bg-[#7A1C32] text-white text-xs font-bold shadow-md transition-all transform hover:scale-[1.01]"
           >
             <Check className="w-4 h-4" />
-            <span>تأكيد الطلبية (Confirm)</span>
+            <span>تأكيد الطلبية (Confirm Order)</span>
           </button>
 
           <button
@@ -248,18 +240,10 @@ export default function OrderDetailsModal({
               onCancelOrder(order.id);
               onClose();
             }}
-            className="flex-1 flex items-center justify-center gap-2 py-3 rounded-2xl bg-rose-100 hover:bg-rose-200 text-rose-800 text-xs font-bold border border-rose-300 transition-all"
+            className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-rose-100 hover:bg-rose-200 text-rose-800 text-xs font-bold border border-rose-300 transition-all"
           >
             <XCircle className="w-4 h-4 text-rose-600" />
-            <span>إلغاء الطلبية (Cancel)</span>
-          </button>
-
-          <button
-            onClick={handlePrint}
-            className="flex items-center justify-center gap-2 px-5 py-3 rounded-2xl bg-gray-100 hover:bg-gray-200 text-gray-800 text-xs font-bold border border-gray-300 transition-all"
-          >
-            <Printer className="w-4 h-4" />
-            <span>طباعة الفاتورة</span>
+            <span>إلغاء الطلبية (Cancel Order)</span>
           </button>
         </div>
       </div>
