@@ -25,7 +25,6 @@ import {
   Boxes,
   HelpCircle,
   Clock,
-  ShieldCheck,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { Category, Product, ProductVariant, Supplier, StockType } from '@/types/admin';
@@ -33,7 +32,7 @@ import { Category, Product, ProductVariant, Supplier, StockType } from '@/types/
 interface AddProductModalProps {
   isOpen: boolean;
   onClose: () => void;
-  activeWarehouse?: StockType; // Strictly enforces context isolation: 'DELIVERY' | 'STORE' | 'WHOLESALE'
+  activeWarehouse?: StockType; // 'DELIVERY' | 'STORE' | 'WHOLESALE'
   onProductAdded: (newProduct: Product) => void;
   onProductUpdated?: (updatedProduct: Product) => void;
   reFetchProducts?: () => Promise<void>;
@@ -98,10 +97,10 @@ export default function AddProductModal({
 
   // Pricing State (DZD)
   const [costPrice, setCostPrice] = useState<number | ''>('');
-  const [sellingPrice, setSellingPrice] = useState<number | ''>(''); // Retail / Delivery / Store
+  const [sellingPrice, setSellingPrice] = useState<number | ''>('');
   const [oldPrice, setOldPrice] = useState<number | ''>('');
-  const [wholesalePrice, setWholesalePrice] = useState<number | ''>(''); // Wholesale
-  const [superGrosPrice, setSuperGrosPrice] = useState<number | ''>(''); // Super Gros Wholesale
+  const [wholesalePrice, setWholesalePrice] = useState<number | ''>('');
+  const [superGrosPrice, setSuperGrosPrice] = useState<number | ''>('');
 
   // Advanced Wholesale System State
   const [unitsPerSerie, setUnitsPerSerie] = useState<number>(4);
@@ -140,35 +139,6 @@ export default function AddProductModal({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const isEditMode = !!productToEdit;
-
-  // Context Descriptions
-  const getContextMeta = () => {
-    switch (activeWarehouse) {
-      case 'DELIVERY':
-        return {
-          title: 'مخزون التوصيل والتجزئة (Delivery Stock)',
-          badgeColor: 'bg-[#8A2B43] text-white',
-          icon: ShoppingBag,
-          description: 'تعديل أسعار وكميات التجزئة الإلكترونية الخاصة بالتوصيل للمنازل والمحطات.',
-        };
-      case 'STORE':
-        return {
-          title: 'مخزون المحل ونقطة البيع (POS Store Stock)',
-          badgeColor: 'bg-emerald-700 text-white',
-          icon: Store,
-          description: 'تعديل أسعار وكميات البيع في المحل الفيزيائي بالشلف.',
-        };
-      case 'WHOLESALE':
-        return {
-          title: 'مخزون الجملة والسوبر قرو (Wholesale Stock)',
-          badgeColor: 'bg-purple-900 text-white',
-          icon: Boxes,
-          description: 'تعديل أسعار الجملة والسوبر قرو، ونظام السريات والطلب المسبق.',
-        };
-    }
-  };
-
-  const contextMeta = getContextMeta();
 
   // Form Reset
   const resetForm = () => {
@@ -647,7 +617,6 @@ export default function AddProductModal({
 
       activeColors.forEach((c) => {
         c.activeSizes.forEach((s) => {
-          // Find matching existing variant from DB if present
           const existingV = existingDbVariants.find(
             (ev) =>
               (ev.color_name === c.colorName.trim() || ev.color === c.colorName.trim()) &&
@@ -658,7 +627,6 @@ export default function AddProductModal({
           let finalStore = existingV ? Number(existingV.store_stock) || 0 : 5;
           let finalWs = existingV ? Number(existingV.wholesale_stock) || 0 : 20;
 
-          // Scope stock update strictly to active warehouse
           if (activeWarehouse === 'DELIVERY') {
             finalDel = c.deliveryStocks[s] !== undefined ? c.deliveryStocks[s] : 10;
           } else if (activeWarehouse === 'STORE') {
@@ -755,7 +723,7 @@ export default function AddProductModal({
           await reFetchProducts();
         }
 
-        alert(`تم تعديل وحفظ بيانات المنتج بنجاح في سياق (${contextMeta.title})! ✅`);
+        alert('تم تعديل وحفظ بيانات المنتج بنجاح! ✅');
       } else {
         // INSERT new product
         let insertedProductId = `prod-${Date.now()}`;
@@ -827,7 +795,7 @@ export default function AddProductModal({
           await reFetchProducts();
         }
 
-        alert(`تم إضافة المنتج بنجاح في سياق (${contextMeta.title})! ✅`);
+        alert('تم إضافة المنتج بنجاح! ✅');
       }
 
       resetForm();
@@ -843,27 +811,20 @@ export default function AddProductModal({
   if (!isOpen) return null;
 
   const discountPercent = calculateDiscountPercentage();
-  const ContextIcon = contextMeta.icon;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm dir-rtl" dir="rtl">
       <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl border border-gray-100 flex flex-col max-h-[90vh] overflow-hidden animate-scale-up">
-        {/* Context-Aware Modal Header */}
+        {/* Clean Modal Header (Without any extra banners or badges) */}
         <div className="p-5 sm:p-6 bg-gradient-to-r from-[#8A2B43] to-[#7A1C32] text-white flex items-center justify-between shrink-0 shadow-md">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center border border-white/20">
-              <ContextIcon className="w-5 h-5 text-pyjama-pink" />
+              <Package className="w-5 h-5 text-pyjama-pink" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg sm:text-xl font-bold">
-                  {isEditMode ? 'تعديل بيانات المنتج' : 'إضافة منتج جديد'}
-                </h2>
-                <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${contextMeta.badgeColor}`}>
-                  {contextMeta.title}
-                </span>
-              </div>
-              <p className="text-xs text-white/80 mt-0.5">{contextMeta.description}</p>
+              <h2 className="text-lg sm:text-xl font-bold">
+                {isEditMode ? 'تعديل بيانات المنتج (Edit Product)' : 'إضافة منتج جديد (Add New Product)'}
+              </h2>
             </div>
           </div>
 
@@ -874,16 +835,6 @@ export default function AddProductModal({
           >
             <X className="w-5 h-5" />
           </button>
-        </div>
-
-        {/* Strict Warehouse Context Isolation Notice Bar */}
-        <div className="px-6 py-2.5 bg-amber-50/80 border-b border-amber-100 flex items-center justify-between text-xs text-amber-900 font-medium">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-amber-700 shrink-0" />
-            <span>
-              نظام التعديل المعزول بالسياق مفّعل تلقائياً: يتم حظر تعديل كميات أو أسعار المستودعات الأخرى لمنع التضارب.
-            </span>
-          </div>
         </div>
 
         {/* Modal Scrollable Body Form */}
@@ -1020,7 +971,7 @@ export default function AddProductModal({
             <div className="flex items-center justify-between border-b border-gray-200/80 pb-3">
               <h3 className="text-sm font-bold text-[#7A1C32] flex items-center gap-2">
                 <DollarSign className="w-4 h-4 text-[#8A2B43]" />
-                <span>ثانياً: أسعار المستودع النشط ({activeWarehouse === 'DELIVERY' ? 'التوصيل' : activeWarehouse === 'STORE' ? 'المحل' : 'الجملة'})</span>
+                <span>ثانياً: الأسعار (Pricing)</span>
               </h3>
 
               {discountPercent !== null && activeWarehouse !== 'WHOLESALE' && (
@@ -1176,16 +1127,6 @@ export default function AddProductModal({
                   />
                 </div>
               </div>
-
-              <div className="p-3 bg-white/90 rounded-2xl border border-purple-200 text-xs text-purple-900 space-y-1">
-                <p className="font-bold flex items-center gap-1.5">
-                  <HelpCircle className="w-4 h-4 text-purple-700" />
-                  <span>تنبيه نظام السلسلة:</span>
-                </p>
-                <p className="text-[11px] text-purple-800">
-                  تفعيل خيار <strong>Sur Commande</strong> يتيح عرض المنتج في متجر الجملة للطلب المصنّعي المباشر دون الحاجة لإدخال أعداد مخزون فيزيائي مسبق.
-                </p>
-              </div>
             </div>
           )}
 
@@ -1296,7 +1237,7 @@ export default function AddProductModal({
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-gray-200/80 pb-3">
               <h3 className="text-sm font-bold text-[#7A1C32] flex items-center gap-2">
                 <Palette className="w-4 h-4 text-[#8A2B43]" />
-                <span>{activeWarehouse === 'WHOLESALE' ? 'خامساً' : 'رابعاً'}: ألوان المنتج وكميات ({contextMeta.title})</span>
+                <span>{activeWarehouse === 'WHOLESALE' ? 'خامساً' : 'رابعاً'}: ألوان المنتج والمخزون</span>
               </h3>
 
               <button
@@ -1432,7 +1373,7 @@ export default function AddProductModal({
                   <div className="space-y-3 pt-2 border-t border-gray-100">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-gray-700">
-                        كميات مخزون ({activeWarehouse === 'DELIVERY' ? 'التوصيل' : activeWarehouse === 'STORE' ? 'المحل' : 'الجملة'}) للون ({colorItem.colorName || `لون ${index + 1}`}):
+                        كميات المخزون للون ({colorItem.colorName || `لون ${index + 1}`}):
                       </span>
 
                       <div className="flex items-center gap-2">
@@ -1537,7 +1478,7 @@ export default function AddProductModal({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="وصف اختياري للمنتج (مثال: بيجاما صيفية مصنوعة من الحرير الطبيعي 100%، ملمس ناعم ومريح للنوم، غسيل يدوي بماء بارد)..."
-              className="w-full p-4 bg-white rounded-2xl border border-gray-200 text-xs font-sans focus:outline-none focus:border-[#8A2B43] shadow-sm"
+              className="w-full p-4 bg-[#ffffff] rounded-2xl border border-gray-200 text-xs font-sans focus:outline-none focus:border-[#8A2B43] shadow-sm"
             />
           </div>
 
@@ -1563,9 +1504,7 @@ export default function AddProductModal({
                 <>
                   <CheckCircle className="w-4 h-4" />
                   <span>
-                    {isEditMode
-                      ? `تحديث وحفظ بيانات سياق (${activeWarehouse === 'DELIVERY' ? 'التوصيل' : activeWarehouse === 'STORE' ? 'المحل' : 'الجملة'})`
-                      : `حفظ المنتج في سياق (${activeWarehouse === 'DELIVERY' ? 'التوصيل' : activeWarehouse === 'STORE' ? 'المحل' : 'الجملة'})`}
+                    {isEditMode ? 'تحديث وتعديل المنتج (Update Product)' : 'حفظ المنتج في قاعدة البيانات (Save Product)'}
                   </span>
                 </>
               )}
