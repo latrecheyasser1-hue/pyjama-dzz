@@ -368,7 +368,7 @@ export default function MasterAdminPage() {
             <div>
               <h1 className="text-lg sm:text-xl font-black text-pyjama-charcoal">
                 {activeSection === 'NEW_ORDERS' && 'الطلبيات الجديدة الواردة (Retail & Wholesale)'}
-                {activeSection === 'INVENTORY' && `المخزون والمستودعات • ${activeStockTab === 'DELIVERY' ? 'مخزون التوصيل' : activeStockTab === 'STORE' ? 'مخزون المحل' : 'مخزون الجملة'}`}
+                {activeSection === 'INVENTORY' && 'إدارة المخزون والمنتجات (Inventory)'}
                 {activeSection === 'CATEGORIES' && 'الأقسام والتصنيفات (Categories)'}
                 {activeSection === 'SUPPLIERS' && 'إدارة الموردين والورشات (Suppliers)'}
                 {activeSection === 'CUSTOMERS' && 'تصنيف الزبائن الجزائريين (Customer Scoring)'}
