@@ -58,7 +58,7 @@ const initialSettings: AdminSettings = {
   addressCommune: 'الشلف',
 };
 
-// Clean Empty Categories array ready for live Supabase synchronization
+// Clean Categories array ready for live Supabase synchronization
 const initialCategories: Category[] = [];
 
 const initialSuppliers: Supplier[] = [
@@ -213,15 +213,14 @@ export default function MasterAdminPage() {
     try {
       const { data, error } = await supabase
         .from('categories')
-        .select('*')
-        .order('created_at', { ascending: true });
+        .select('*');
 
       if (error) {
-        console.error('Error fetching categories from Supabase:', error);
+        console.warn('Supabase categories notice:', error.message || error.code || error);
         return;
       }
 
-      if (data) {
+      if (data && data.length > 0) {
         const mapped: Category[] = data.map((item: any) => ({
           id: String(item.id),
           name: item.name || item.name_ar || item.name_fr || '',
@@ -230,8 +229,8 @@ export default function MasterAdminPage() {
         }));
         setCategories(mapped);
       }
-    } catch (err) {
-      console.error('Failed to fetch categories:', err);
+    } catch (err: any) {
+      console.warn('Failed to fetch categories:', err?.message || err);
     }
   }, []);
 
@@ -305,6 +304,15 @@ export default function MasterAdminPage() {
 
   const handleAddCategory = async (name: string) => {
     const slug = name.toLowerCase().trim().replace(/\s+/g, '-');
+    const newCat: Category = {
+      id: `cat-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+      name,
+      slug,
+    };
+
+    // Optimistically update local state so UI updates instantly
+    setCategories((prev) => [...prev, newCat]);
+
     try {
       const { data, error } = await supabase
         .from('categories')
@@ -312,27 +320,18 @@ export default function MasterAdminPage() {
         .select();
 
       if (error) {
-        console.error('Error inserting category into Supabase:', error);
-        // Fallback local insertion if DB schema varies
-        const fallbackCat: Category = {
-          id: `cat-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-          name,
-          slug,
-        };
-        setCategories((prev) => [...prev, fallbackCat]);
+        console.warn('Supabase category insert notice:', error.message || error.code || error);
       } else if (data && data.length > 0) {
-        const newCat: Category = {
+        const dbCat: Category = {
           id: String(data[0].id),
           name: data[0].name || name,
           slug: data[0].slug || slug,
           coverImageUrl: data[0].cover_image_url || data[0].image_url || null,
         };
-        setCategories((prev) => [...prev, newCat]);
-      } else {
-        await fetchCategories();
+        setCategories((prev) => prev.map((c) => (c.id === newCat.id ? dbCat : c)));
       }
-    } catch (err) {
-      console.error('Failed to add category:', err);
+    } catch (err: any) {
+      console.warn('Failed to insert category into Supabase:', err?.message || err);
     }
   };
 
@@ -343,12 +342,10 @@ export default function MasterAdminPage() {
     try {
       const { error } = await supabase.from('categories').delete().eq('id', id);
       if (error) {
-        console.error('Error deleting category from Supabase:', error);
-        await fetchCategories();
+        console.warn('Supabase category delete notice:', error.message || error.code || error);
       }
-    } catch (err) {
-      console.error('Failed to delete category:', err);
-      await fetchCategories();
+    } catch (err: any) {
+      console.warn('Failed to delete category from Supabase:', err?.message || err);
     }
   };
 
