@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   X,
   Plus,
@@ -9,7 +9,6 @@ import {
   Wand2,
   Grid,
   DollarSign,
-  Tag,
   Palette,
   Ruler,
   FileText,
@@ -19,6 +18,9 @@ import {
   CheckCircle,
   Sparkles,
   Zap,
+  Pipette,
+  UploadCloud,
+  Check,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { Category, Product, ProductColor, ProductVariant, Supplier } from '@/types/admin';
@@ -59,7 +61,12 @@ export const SIZE_CATEGORIES: Record<SizeCategoryKey, { label: string; sizes: st
 interface ColorInputItem {
   id: string;
   colorName: string;
+  colorHex: string;
   imageUrl: string;
+  // Size-specific Stock Quantities map: { 'S': 10, 'M': 15, 'L': 5 }
+  sizeStocks: Record<string, number>;
+  // Active selected sizes for this color
+  activeSizes: string[];
 }
 
 export default function AddProductModal({
@@ -89,7 +96,14 @@ export default function AddProductModal({
 
   // Color Variants State
   const [colors, setColors] = useState<ColorInputItem[]>([
-    { id: 'c-1', colorName: 'Burgundy (عنابي)', imageUrl: '' },
+    {
+      id: 'c-1',
+      colorName: 'Burgundy (عنابي)',
+      colorHex: '#8A2B43',
+      imageUrl: '',
+      sizeStocks: { S: 10, M: 10, L: 10, XL: 10 },
+      activeSizes: ['S', 'M', 'L', 'XL'],
+    },
   ]);
 
   // Description & Additional Notes
@@ -178,20 +192,6 @@ export default function AddProductModal({
     setSku(`PYJ-${randomNum}`);
   };
 
-  // Handle Size Category Change
-  const handleSizeCategoryChange = (catKey: SizeCategoryKey) => {
-    setSizeCategory(catKey);
-    setIsStandardSize(false);
-    const availableSizes = SIZE_CATEGORIES[catKey].sizes;
-    setMinSize(availableSizes[0]);
-    setMaxSize(availableSizes[Math.min(3, availableSizes.length - 1)]);
-  };
-
-  // Toggle Standard Size
-  const handleToggleStandardSize = () => {
-    setIsStandardSize((prev) => !prev);
-  };
-
   // Helper to calculate sizes array
   const getGeneratedSizes = (): string[] => {
     if (isStandardSize) {
@@ -208,15 +208,67 @@ export default function AddProductModal({
     return currentSizes.slice(minIndex, maxIndex + 1);
   };
 
+  const generatedSizesList = getGeneratedSizes();
+
+  // Sync active sizes whenever generatedSizesList changes
+  useEffect(() => {
+    setColors((prevColors) =>
+      prevColors.map((color) => {
+        const newActive = color.activeSizes.filter((s) => generatedSizesList.includes(s));
+        const missing = generatedSizesList.filter((s) => !color.activeSizes.includes(s));
+        const updatedActive = [...newActive, ...missing];
+
+        const updatedStocks = { ...color.sizeStocks };
+        generatedSizesList.forEach((s) => {
+          if (updatedStocks[s] === undefined) {
+            updatedStocks[s] = 10;
+          }
+        });
+
+        return {
+          ...color,
+          activeSizes: updatedActive,
+          sizeStocks: updatedStocks,
+        };
+      })
+    );
+  }, [minSize, maxSize, sizeCategory, isStandardSize]);
+
+  // Size Category Change
+  const handleSizeCategoryChange = (catKey: SizeCategoryKey) => {
+    setSizeCategory(catKey);
+    setIsStandardSize(false);
+    const availableSizes = SIZE_CATEGORIES[catKey].sizes;
+    setMinSize(availableSizes[0]);
+    setMaxSize(availableSizes[Math.min(3, availableSizes.length - 1)]);
+  };
+
+  // Toggle Standard Size
+  const handleToggleStandardSize = () => {
+    setIsStandardSize((prev) => !prev);
+  };
+
   // Color Handlers
   const handleAddColor = () => {
+    const initialStocks: Record<string, number> = {};
+    generatedSizesList.forEach((s) => {
+      initialStocks[s] = 10;
+    });
+
     setColors((prev) => [
       ...prev,
-      { id: `c-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`, colorName: '', imageUrl: '' },
+      {
+        id: `c-${Date.now()}-${Math.random().toString(36).substring(2, 5)}`,
+        colorName: '',
+        colorHex: '#8A2B43',
+        imageUrl: '',
+        sizeStocks: initialStocks,
+        activeSizes: [...generatedSizesList],
+      },
     ]);
   };
 
-  const handleUpdateColor = (id: string, field: 'colorName' | 'imageUrl', value: string) => {
+  const handleUpdateColor = (id: string, field: keyof ColorInputItem, value: any) => {
     setColors((prev) =>
       prev.map((c) => (c.id === id ? { ...c, [field]: value } : c))
     );
@@ -225,6 +277,96 @@ export default function AddProductModal({
   const handleRemoveColor = (id: string) => {
     if (colors.length <= 1) return;
     setColors((prev) => prev.filter((c) => c.id !== id));
+  };
+
+  // Eyedropper API execution
+  const handleOpenEyedropper = async (colorId: string) => {
+    if (typeof window !== 'undefined' && 'EyeDropper' in window) {
+      try {
+        const eyeDropper = new (window as any).EyeDropper();
+        const result = await eyeDropper.open();
+        if (result && result.sRGBHex) {
+          handleUpdateColor(colorId, 'colorHex', result.sRGBHex);
+        }
+      } catch (e) {
+        console.log('Eyedropper closed without selection');
+      }
+    } else {
+      alert('ميزة أداة القطارة غيرة مدعومة مباشرة في هذا المتصفح. استخدم العجلة الملونة بدلاً منها.');
+    }
+  };
+
+  // Direct Image File Upload Handler
+  const handleImageFileChange = async (colorId: string, file: File) => {
+    if (!file) return;
+
+    // Instant local preview
+    const localUrl = URL.createObjectURL(file);
+    handleUpdateColor(colorId, 'imageUrl', localUrl);
+
+    // Upload to Supabase Storage
+    try {
+      const fileExt = file.name.split('.').pop() || 'jpg';
+      const fileName = `color-${Date.now()}-${Math.random().toString(36).substring(2, 6)}.${fileExt}`;
+      const filePath = `products/${fileName}`;
+
+      const { data, error } = await supabase.storage
+        .from('products')
+        .upload(filePath, file);
+
+      if (!error && data) {
+        const { data: publicData } = supabase.storage
+          .from('products')
+          .getPublicUrl(filePath);
+
+        if (publicData?.publicUrl) {
+          handleUpdateColor(colorId, 'imageUrl', publicData.publicUrl);
+        }
+      }
+    } catch (err) {
+      console.warn('Storage upload notice (retaining local preview URL):', err);
+    }
+  };
+
+  // Size Chip Toggles for specific color
+  const handleToggleColorSize = (colorId: string, size: string) => {
+    setColors((prev) =>
+      prev.map((c) => {
+        if (c.id !== colorId) return c;
+        const exists = c.activeSizes.includes(size);
+        const nextActive = exists
+          ? c.activeSizes.filter((s) => s !== size)
+          : [...c.activeSizes, size];
+        return { ...c, activeSizes: nextActive };
+      })
+    );
+  };
+
+  const handleSelectAllSizesForColor = (colorId: string) => {
+    setColors((prev) =>
+      prev.map((c) => (c.id === colorId ? { ...c, activeSizes: [...generatedSizesList] } : c))
+    );
+  };
+
+  const handleDeselectAllSizesForColor = (colorId: string) => {
+    setColors((prev) =>
+      prev.map((c) => (c.id === colorId ? { ...c, activeSizes: [] } : c))
+    );
+  };
+
+  const handleUpdateStockQuantity = (colorId: string, size: string, qty: number) => {
+    setColors((prev) =>
+      prev.map((c) => {
+        if (c.id !== colorId) return c;
+        return {
+          ...c,
+          sizeStocks: {
+            ...c.sizeStocks,
+            [size]: Math.max(0, qty),
+          },
+        };
+      })
+    );
   };
 
   // Calculate discount percentage
@@ -251,7 +393,16 @@ export default function AddProductModal({
     setIsStandardSize(false);
     setMinSize('S');
     setMaxSize('XL');
-    setColors([{ id: 'c-1', colorName: 'Burgundy (عنابي)', imageUrl: '' }]);
+    setColors([
+      {
+        id: 'c-1',
+        colorName: 'Burgundy (عنابي)',
+        colorHex: '#8A2B43',
+        imageUrl: '',
+        sizeStocks: { S: 10, M: 10, L: 10, XL: 10 },
+        activeSizes: ['S', 'M', 'L', 'XL'],
+      },
+    ]);
     setDescription('');
   };
 
@@ -269,7 +420,6 @@ export default function AddProductModal({
     }
 
     const finalSku = sku.trim() || `PYJ-${Math.floor(100000 + Math.random() * 900000)}`;
-    const generatedSizes = getGeneratedSizes();
     const activeColors = colors.filter((c) => c.colorName.trim() !== '');
 
     if (activeColors.length === 0) {
@@ -280,7 +430,7 @@ export default function AddProductModal({
     setIsSubmitting(true);
 
     try {
-      // 1. Prepare Product Base Payload
+      // 1. Base Product Payload
       const productPayload = {
         name: nameAr.trim(),
         sku: finalSku,
@@ -316,41 +466,46 @@ export default function AddProductModal({
         await supabase.from('product_colors').insert(colorRows);
 
         // 4. Insert Child `product_sizes`
-        const sizeRows = generatedSizes.map((s) => ({
+        const sizeRows = generatedSizesList.map((s) => ({
           product_id: insertedProductId,
           size_name: s,
         }));
         await supabase.from('product_sizes').insert(sizeRows);
 
-        // 5. Insert Child `product_variants`
+        // 5. Insert Child `product_variants` (Color x Active Sizes x Custom Stock Quantities)
         const variantRows: any[] = [];
         activeColors.forEach((c) => {
-          generatedSizes.forEach((s) => {
+          c.activeSizes.forEach((s) => {
+            const stockVal = c.sizeStocks[s] !== undefined ? c.sizeStocks[s] : 10;
             variantRows.push({
               product_id: insertedProductId,
               color_name: c.colorName.trim(),
               size_name: s,
-              delivery_stock: 10,
-              store_stock: 10,
-              wholesale_stock: 10,
+              delivery_stock: stockVal,
+              store_stock: stockVal,
+              wholesale_stock: stockVal,
             });
           });
         });
-        await supabase.from('product_variants').insert(variantRows);
+
+        if (variantRows.length > 0) {
+          await supabase.from('product_variants').insert(variantRows);
+        }
       }
 
       // 6. Build Local Product Object for instant UI sync
       const generatedVariants: ProductVariant[] = [];
       activeColors.forEach((c) => {
-        generatedSizes.forEach((s) => {
+        c.activeSizes.forEach((s) => {
+          const stockVal = c.sizeStocks[s] !== undefined ? c.sizeStocks[s] : 10;
           generatedVariants.push({
             id: `v-${Date.now()}-${c.colorName}-${s}`,
             productId: insertedProductId,
             size: s,
             color: c.colorName.trim(),
-            deliveryStock: 10,
-            storeStock: 10,
-            wholesaleStock: 10,
+            deliveryStock: stockVal,
+            storeStock: stockVal,
+            wholesaleStock: stockVal,
           });
         });
       });
@@ -372,7 +527,7 @@ export default function AddProductModal({
         description: description.trim() || undefined,
         imageUrl: activeColors[0]?.imageUrl || undefined,
         colors: activeColors.map((c) => ({ colorName: c.colorName, imageUrl: c.imageUrl })),
-        sizes: generatedSizes,
+        sizes: generatedSizesList,
         variants: generatedVariants,
       };
 
@@ -389,7 +544,6 @@ export default function AddProductModal({
 
   if (!isOpen) return null;
 
-  const generatedSizesList = getGeneratedSizes();
   const discountPercent = calculateDiscountPercentage();
   const currentCategorySizes = SIZE_CATEGORIES[sizeCategory].sizes;
 
@@ -405,7 +559,7 @@ export default function AddProductModal({
             <div>
               <h2 className="text-lg sm:text-xl font-bold">إضافة منتج جديد (Add New Product)</h2>
               <p className="text-xs text-white/80 mt-0.5">
-                تحديد أنواع المقاسات والمرونة (الملابس، الأحذية، الصدريات، والمقاس الموحد)
+                رفع الصور المباشر، قطارة الألوان، وتحديد كميات المقاسات لكل لون
               </p>
             </div>
           </div>
@@ -722,12 +876,12 @@ export default function AddProductModal({
             </div>
           </div>
 
-          {/* SECTION D: Color Variants with Dedicated Images */}
-          <div className="space-y-4 bg-pyjama-cream/40 p-5 rounded-3xl border border-gray-100">
+          {/* SECTION D: Color Variants, Direct Image Upload, Eyedropper & Per-Size Stock */}
+          <div className="space-y-6 bg-pyjama-cream/40 p-5 rounded-3xl border border-gray-100">
             <div className="flex items-center justify-between border-b border-gray-200/80 pb-3">
               <h3 className="text-sm font-bold text-[#7A1C32] flex items-center gap-2">
                 <Palette className="w-4 h-4 text-[#8A2B43]" />
-                <span>رابعاً: ألوان المنتج والصور المخصصة (Colors & Dedicated Images)</span>
+                <span>رابعاً: ألوان المنتج، رفع الصور المباشر، والكميات لكل مقاس</span>
               </h3>
 
               <button
@@ -740,51 +894,205 @@ export default function AddProductModal({
               </button>
             </div>
 
-            <div className="space-y-3">
+            {/* List of Colors */}
+            <div className="space-y-6">
               {colors.map((colorItem, index) => (
                 <div
                   key={colorItem.id}
-                  className="bg-white p-4 rounded-2xl border border-gray-200 flex flex-col sm:flex-row items-stretch sm:items-center gap-3 shadow-sm"
+                  className="bg-white p-5 rounded-3xl border border-gray-200 shadow-sm space-y-4"
                 >
-                  <span className="w-6 h-6 rounded-full bg-pyjama-cream text-[#8A2B43] font-mono text-xs font-bold flex items-center justify-center shrink-0">
-                    {index + 1}
-                  </span>
+                  {/* Top Bar for Color Item */}
+                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                    <div className="flex items-center gap-3 flex-1">
+                      <span className="w-7 h-7 rounded-full bg-pyjama-cream text-[#8A2B43] font-mono text-xs font-bold flex items-center justify-center shrink-0">
+                        {index + 1}
+                      </span>
 
-                  {/* Color Name */}
-                  <div className="flex-1">
-                    <input
-                      type="text"
-                      value={colorItem.colorName}
-                      onChange={(e) => handleUpdateColor(colorItem.id, 'colorName', e.target.value)}
-                      placeholder="اسم اللون (مثال: عنابي / أسود / بيج / Rose)"
-                      className="w-full px-3 py-2.5 bg-pyjama-cream/20 rounded-xl border border-gray-200 text-xs font-bold focus:outline-none focus:border-[#8A2B43]"
-                      required
-                    />
+                      {/* Color Circle Badge */}
+                      <div
+                        className="w-8 h-8 rounded-full border-2 border-white shadow-md shrink-0 transition-transform hover:scale-110"
+                        style={{ backgroundColor: colorItem.colorHex || '#8A2B43' }}
+                        title={`الدرجة المحددة: ${colorItem.colorHex}`}
+                      />
+
+                      {/* Color Name Input */}
+                      <input
+                        type="text"
+                        value={colorItem.colorName}
+                        onChange={(e) => handleUpdateColor(colorItem.id, 'colorName', e.target.value)}
+                        placeholder="اسم اللون (مثال: عنابي ملكي / أسود / بيج)"
+                        className="flex-1 px-4 py-2.5 bg-pyjama-cream/30 rounded-xl border border-gray-200 text-xs font-bold focus:outline-none focus:border-[#8A2B43]"
+                        required
+                      />
+
+                      {/* Eyedropper & Color Picker */}
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {/* Native Color Picker */}
+                        <input
+                          type="color"
+                          value={colorItem.colorHex || '#8A2B43'}
+                          onChange={(e) => handleUpdateColor(colorItem.id, 'colorHex', e.target.value)}
+                          className="w-9 h-9 p-0.5 rounded-xl border border-gray-200 cursor-pointer bg-white"
+                          title="عجلة الألوان"
+                        />
+
+                        {/* Browser Eyedropper API Button */}
+                        <button
+                          type="button"
+                          onClick={() => handleOpenEyedropper(colorItem.id)}
+                          className="p-2.5 rounded-xl bg-pyjama-pink-soft text-[#8A2B43] hover:bg-[#8A2B43] hover:text-white transition-all shadow-sm"
+                          title="التقاط درجة اللون مباشرة من الصورة أو الشاشة"
+                        >
+                          <Pipette className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Remove Color Button */}
+                    {colors.length > 1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleRemoveColor(colorItem.id)}
+                        className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all shrink-0 self-end sm:self-center"
+                        title="حذف هذا اللون"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
 
-                  {/* Dedicated Image URL */}
-                  <div className="flex-[2] relative">
-                    <ImageIcon className="w-4 h-4 text-gray-400 absolute right-3 top-3" />
-                    <input
-                      type="text"
-                      value={colorItem.imageUrl}
-                      onChange={(e) => handleUpdateColor(colorItem.id, 'imageUrl', e.target.value)}
-                      placeholder="رابط صورة هذا اللون المخصصة (URL)"
-                      className="w-full pr-9 pl-3 py-2.5 bg-pyjama-cream/20 rounded-xl border border-gray-200 text-xs font-mono focus:outline-none focus:border-[#8A2B43]"
-                    />
+                  {/* Middle: Direct Image File Upload Dropzone */}
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                      صورة هذا اللون المخصصة (Direct Image Upload)
+                    </label>
+
+                    {colorItem.imageUrl ? (
+                      <div className="relative w-full h-36 rounded-2xl overflow-hidden border border-gray-200 group bg-gray-50 flex items-center justify-center">
+                        <img
+                          src={colorItem.imageUrl}
+                          alt={colorItem.colorName || 'صورة اللون'}
+                          className="max-h-full max-w-full object-contain"
+                        />
+                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                          <label className="px-4 py-2 bg-white/90 text-gray-800 rounded-xl text-xs font-bold cursor-pointer hover:bg-white transition-all">
+                            تغيير الصورة
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) handleImageFileChange(colorItem.id, file);
+                              }}
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateColor(colorItem.id, 'imageUrl', '')}
+                            className="p-2 bg-rose-600 text-white rounded-xl hover:bg-rose-700 transition-all"
+                            title="حذف الصورة"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <label className="border-2 border-dashed border-gray-200 hover:border-[#8A2B43] bg-pyjama-cream/20 hover:bg-pyjama-cream/40 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all">
+                        <UploadCloud className="w-8 h-8 text-[#8A2B43] mb-2" />
+                        <span className="text-xs font-bold text-gray-700">انقر هنا أو اسحب الصورة لرفع صورة هذا اللون مباشرة</span>
+                        <span className="text-[10px] text-gray-400 mt-1">يدعم JPG, PNG, WEBP من الهاتف أو الحاسوب</span>
+                        <input
+                          type="file"
+                          accept="image/*"
+                          className="hidden"
+                          onChange={(e) => {
+                            const file = e.target.files?.[0];
+                            if (file) handleImageFileChange(colorItem.id, file);
+                          }}
+                        />
+                      </label>
+                    )}
                   </div>
 
-                  {/* Remove Color Button */}
-                  {colors.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => handleRemoveColor(colorItem.id)}
-                      className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all shrink-0"
-                      title="حذف هذا اللون"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
+                  {/* Bottom: Dynamic Sizes & Stock Quantities per Color */}
+                  <div className="space-y-3 pt-2 border-t border-gray-100">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-gray-700">
+                        المقاسات والكميات المتوفرة للون ({colorItem.colorName || `لون ${index + 1}`}):
+                      </span>
+
+                      {/* Quick Action Buttons for Sizes */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleSelectAllSizesForColor(colorItem.id)}
+                          className="text-[11px] font-bold text-[#8A2B43] hover:underline"
+                        >
+                          تحديد الكل
+                        </button>
+                        <span className="text-gray-300">•</span>
+                        <button
+                          type="button"
+                          onClick={() => handleDeselectAllSizesForColor(colorItem.id)}
+                          className="text-[11px] font-bold text-gray-500 hover:underline"
+                        >
+                          إلغاء الكل
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Chips & Quantities Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+                      {generatedSizesList.map((size) => {
+                        const isActive = colorItem.activeSizes.includes(size);
+                        const qtyVal = colorItem.sizeStocks[size] ?? 10;
+
+                        return (
+                          <div
+                            key={`${colorItem.id}-${size}`}
+                            className={`p-2.5 rounded-2xl border transition-all flex flex-col items-center gap-1.5 ${
+                              isActive
+                                ? 'bg-pyjama-cream/80 border-[#8A2B43] shadow-sm'
+                                : 'bg-gray-50 border-gray-200 opacity-60'
+                            }`}
+                          >
+                            <button
+                              type="button"
+                              onClick={() => handleToggleColorSize(colorItem.id, size)}
+                              className={`w-full py-1 rounded-xl text-xs font-mono font-black flex items-center justify-center gap-1 transition-all ${
+                                isActive
+                                  ? 'bg-[#8A2B43] text-white shadow-xs'
+                                  : 'bg-white text-gray-600 border border-gray-200'
+                              }`}
+                            >
+                              <span>{size}</span>
+                              {isActive && <Check className="w-3 h-3" />}
+                            </button>
+
+                            {isActive && (
+                              <div className="w-full flex items-center justify-center gap-1 mt-0.5">
+                                <span className="text-[10px] font-bold text-gray-500">الكمية:</span>
+                                <input
+                                  type="number"
+                                  min="0"
+                                  value={qtyVal}
+                                  onChange={(e) =>
+                                    handleUpdateStockQuantity(
+                                      colorItem.id,
+                                      size,
+                                      parseInt(e.target.value) || 0
+                                    )
+                                  }
+                                  className="w-12 text-center py-1 bg-white rounded-lg border border-gray-300 text-xs font-mono font-bold focus:outline-none focus:border-[#8A2B43]"
+                                />
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
