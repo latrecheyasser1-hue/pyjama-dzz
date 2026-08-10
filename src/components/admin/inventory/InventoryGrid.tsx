@@ -184,9 +184,20 @@ function ProductCardImageCarousel({ product }: { product: Product }) {
 }
 
 // Color Hex Resolver Helper
-const getColorHex = (colorName: string, variant: any): string => {
-  if (variant?.color_hex) return variant.color_hex;
-  if (variant?.colorHex) return variant.colorHex;
+const getColorHex = (colorName: string, variant: any, product?: Product): string => {
+  if (variant?.color_hex && variant.color_hex.trim() !== '' && variant.color_hex.toLowerCase() !== '#ffffff') {
+    return variant.color_hex;
+  }
+  if (variant?.colorHex && variant.colorHex.trim() !== '' && variant.colorHex.toLowerCase() !== '#ffffff') {
+    return variant.colorHex;
+  }
+
+  if (product?.colors) {
+    const foundCol = product.colors.find((c) => (c.colorName || '').trim().toLowerCase() === (colorName || '').trim().toLowerCase());
+    if (foundCol?.colorHex && foundCol.colorHex.trim() !== '' && foundCol.colorHex.toLowerCase() !== '#ffffff') {
+      return foundCol.colorHex;
+    }
+  }
 
   const normalized = (colorName || '').trim().toLowerCase();
   const colorMap: Record<string, string> = {
@@ -226,14 +237,18 @@ const getColorHex = (colorName: string, variant: any): string => {
     بني: '#78350f',
     marron: '#78350f',
     brown: '#78350f',
-    بيج: '#f5f5dc',
-    beige: '#f5f5dc',
+    بيج: '#E5D3B3',
+    beige: '#E5D3B3',
     بنفسجي: '#9333ea',
     violet: '#9333ea',
     purple: '#9333ea',
   };
 
-  return colorMap[normalized] || '#8A2B43';
+  if (colorMap[normalized]) {
+    return colorMap[normalized];
+  }
+
+  return variant?.color_hex || variant?.colorHex || '#8A2B43';
 };
 
 export default function InventoryGrid({
@@ -591,7 +606,7 @@ export default function InventoryGrid({
                       {/* Color & Size Breakdown per Color */}
                       <div className="space-y-3 pt-3 border-t border-gray-100">
                         {Object.entries(groupedColors).map(([colorName, colorVars]) => {
-                          const hexColorVal = getColorHex(colorName, colorVars?.[0]);
+                          const hexColorVal = getColorHex(colorName, colorVars?.[0], product);
                           const sortedColorVars = sortVariantsAscending(colorVars);
 
                           return (
