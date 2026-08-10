@@ -355,36 +355,19 @@ export default function MasterAdminPage() {
 
       {/* Main Content Area */}
       <main className="flex-1 lg:mr-72 p-4 sm:p-6 lg:p-8 space-y-6">
-        {/* Clean Top Header Bar */}
-        <header className="bg-white rounded-3xl p-4 sm:p-5 border border-gray-100 shadow-card flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => setIsMobileSidebarOpen(true)}
-              className="lg:hidden p-2 rounded-xl bg-pyjama-cream text-[#8A2B43] hover:bg-[#8A2B43] hover:text-white transition-all"
-            >
-              <Menu className="w-5 h-5" />
-            </button>
+        {/* Mobile-Only Drawer Toggle Button */}
+        <div className="lg:hidden flex items-center justify-between bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+          <button
+            onClick={() => setIsMobileSidebarOpen(true)}
+            className="p-2 rounded-xl bg-pyjama-cream text-[#8A2B43] hover:bg-[#8A2B43] hover:text-white transition-all flex items-center gap-2 text-xs font-bold"
+          >
+            <Menu className="w-5 h-5" />
+            <span>القائمة الرئيسية</span>
+          </button>
+          <span className="text-xs font-bold text-pyjama-charcoal font-mono">Pyjama DZ</span>
+        </div>
 
-            <div>
-              <h1 className="text-lg sm:text-xl font-black text-pyjama-charcoal">
-                {activeSection === 'NEW_ORDERS' && 'الطلبيات الجديدة الواردة (Retail & Wholesale)'}
-                {activeSection === 'INVENTORY' && 'إدارة المخزون والمنتجات (Inventory)'}
-                {activeSection === 'CATEGORIES' && 'الأقسام والتصنيفات (Categories)'}
-                {activeSection === 'SUPPLIERS' && 'إدارة الموردين والورشات (Suppliers)'}
-                {activeSection === 'CUSTOMERS' && 'تصنيف الزبائن الجزائريين (Customer Scoring)'}
-                {activeSection === 'COMPLAINTS' && 'الشكاوى والاقتراحات (Complaints)'}
-                {activeSection === 'ANALYTICS' && 'التحليلات المالية والربح (Analytics)'}
-                {activeSection === 'ORDER_HISTORY' && 'الأرشيف والسجل العام (Order History)'}
-                {activeSection === 'SETTINGS' && 'الإعدادات الشاملة للمتجر (Settings)'}
-              </h1>
-              <p className="text-xs text-gray-500 font-medium hidden sm:block">
-                لوحة التحكم الإدارية ERP • بيجاما ديزاين الشلف ({settings.addressWilaya})
-              </p>
-            </div>
-          </div>
-        </header>
-
-        {/* Section View Router */}
+        {/* Section View Router (Each module component renders strictly ONE clean header card) */}
         {activeSection === 'NEW_ORDERS' && (
           <NewOrdersTicker
             orders={orders}
