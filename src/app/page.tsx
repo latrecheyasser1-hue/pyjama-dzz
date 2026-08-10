@@ -315,7 +315,7 @@ export default function MasterAdminPage() {
     );
   };
 
-  const handleUpdateStock = (variantId: string, stockType: StockType, newQuantity: number) => {
+  const handleUpdateStock = async (variantId: string, stockType: StockType, newQuantity: number) => {
     setProducts((prev) =>
       prev.map((p) => ({
         ...p,
@@ -329,10 +329,27 @@ export default function MasterAdminPage() {
         }),
       }))
     );
+
+    // Sync with Supabase `product_variants` table
+    try {
+      const column = stockType === 'DELIVERY' ? 'delivery_stock' : stockType === 'STORE' ? 'store_stock' : 'wholesale_stock';
+      await supabase.from('product_variants').update({ [column]: newQuantity }).eq('id', variantId);
+    } catch (err) {
+      console.warn('Notice updating product variant stock in DB:', err);
+    }
   };
 
   const handleAddProduct = (newProduct: Product) => {
     setProducts((prev) => [newProduct, ...prev]);
+  };
+
+  const handleDeleteProduct = async (productId: string) => {
+    try {
+      await supabase.from('products').delete().eq('id', productId);
+      setProducts((prev) => prev.filter((p) => p.id !== productId));
+    } catch (err) {
+      console.error('Error deleting product from Supabase:', err);
+    }
   };
 
   // Synchronous Supabase Insert with explicit Error Handling & Re-fetch
@@ -506,9 +523,11 @@ export default function MasterAdminPage() {
         {activeSection === 'INVENTORY' && (
           <InventoryManager
             products={products}
+            categories={categories}
             activeStockTab={activeStockTab}
             onUpdateStock={handleUpdateStock}
             onAddProduct={handleAddProduct}
+            onDeleteProduct={handleDeleteProduct}
           />
         )}
 
