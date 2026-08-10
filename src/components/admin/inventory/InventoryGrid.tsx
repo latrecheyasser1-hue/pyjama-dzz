@@ -4,16 +4,12 @@ import React, { useState } from 'react';
 import {
   Layers,
   ArrowRight,
-  Plus,
-  Edit,
   Trash2,
   Package,
-  AlertTriangle,
   Building,
   Tag,
-  Minus,
-  CheckCircle,
   PackageCheck,
+  Edit3,
 } from 'lucide-react';
 import { Product, StockType, Category } from '@/types/admin';
 
@@ -23,6 +19,7 @@ interface InventoryGridProps {
   activeStockTab: StockType;
   onUpdateStock: (variantId: string, stockType: StockType, newQuantity: number) => void;
   onDeleteProduct?: (productId: string) => void;
+  onEditProduct?: (product: Product) => void;
 }
 
 export default function InventoryGrid({
@@ -31,16 +28,27 @@ export default function InventoryGrid({
   activeStockTab = 'DELIVERY',
   onUpdateStock,
   onDeleteProduct,
+  onEditProduct,
 }: InventoryGridProps) {
-  // State for Level 1 vs Level 2 navigation
+  // Level 1 vs Level 2 state
   // null = Level 1 (Category Cards View)
-  // string (categoryId or 'ALL') = Level 2 (Product Cards View)
+  // string (categoryId) = Level 2 (Product Cards View)
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
-  const [deletingProductId, setDeletingProductId] = useState<string | null>(null);
 
-  // Group products by Category to compute counts for Level 1 Cards
+  // Group categories dynamically from DB categories AND products
   const categoryStatsMap: Record<string, { id: string; name: string; count: number; imageUrl?: string }> = {};
 
+  // 1. Seed with registered categories from database
+  categories.forEach((c) => {
+    categoryStatsMap[c.id] = {
+      id: c.id,
+      name: c.name,
+      count: 0,
+      imageUrl: c.imageUrl,
+    };
+  });
+
+  // 2. Add product counts per category
   products.forEach((p) => {
     const catId = p.categoryId || 'uncategorized';
     const catName = p.categoryNameAr || 'أقسام عامة';
@@ -59,16 +67,15 @@ export default function InventoryGrid({
 
   // Level 2 Products Filter
   const activeProducts = products.filter((p) => {
-    if (!selectedCategoryId || selectedCategoryId === 'ALL') return true;
+    if (!selectedCategoryId) return true;
     return p.categoryId === selectedCategoryId || (!p.categoryId && selectedCategoryId === 'uncategorized');
   });
 
   const activeCategoryName =
-    selectedCategoryId === 'ALL'
-      ? 'جميع المنتجات'
-      : categoryCardsList.find((c) => c.id === selectedCategoryId)?.name || 'القسم المحدد';
+    categoryCardsList.find((c) => c.id === selectedCategoryId)?.name || 'القسم المحدد';
 
-  const handleDelete = (productId: string, name: string) => {
+  const handleDelete = (e: React.MouseEvent, productId: string, name: string) => {
+    e.stopPropagation(); // Stop event bubbling to parent card click
     if (!confirm(`هل أنت تأكد من حذف المنتج "${name}"؟`)) return;
     if (onDeleteProduct) {
       onDeleteProduct(productId);
@@ -88,7 +95,7 @@ export default function InventoryGrid({
 
   return (
     <div className="space-y-6 dir-rtl" dir="rtl">
-      {/* LEVEL 1: Category Cards Grid View */}
+      {/* LEVEL 1: Category Cards Grid View (NO ALL PRODUCTS CARD) */}
       {selectedCategoryId === null ? (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
@@ -101,60 +108,48 @@ export default function InventoryGrid({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
-            {/* Card 0: All Products Quick Action Card */}
-            <div
-              onClick={() => setSelectedCategoryId('ALL')}
-              className="bg-gradient-to-br from-[#8A2B43] to-[#6A1B30] text-white p-6 rounded-3xl shadow-lg border border-white/10 cursor-pointer transition-all hover:scale-[1.02] hover:shadow-xl group flex flex-col justify-between min-h-[160px]"
-            >
-              <div className="flex items-start justify-between">
-                <div className="w-12 h-12 rounded-2xl bg-white/10 flex items-center justify-center border border-white/20 group-hover:scale-110 transition-transform">
-                  <Package className="w-6 h-6 text-pyjama-pink" />
-                </div>
-                <span className="px-3 py-1 bg-white/20 backdrop-blur-md rounded-full text-xs font-mono font-bold">
-                  {products.length} منتج
-                </span>
-              </div>
-
-              <div>
-                <h4 className="text-lg font-extrabold text-white">جميع المنتجات (All Products)</h4>
-                <p className="text-xs text-white/80 mt-1">عرض وتعديل مخزون كافة الأقسام دفعة واحدة</p>
-              </div>
+          {categoryCardsList.length === 0 ? (
+            <div className="bg-white rounded-3xl p-10 text-center border border-gray-100 shadow-card space-y-3">
+              <Package className="w-10 h-10 text-gray-300 mx-auto" />
+              <h4 className="text-sm font-bold text-gray-700">لا توجد أقسام مسجلة حالياً</h4>
+              <p className="text-xs text-gray-400">انتقل لتبويب "الأقسام والتصنيفات" لإضافة أقسام جديدة للمتجر.</p>
             </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5">
+              {/* Dynamic Category Cards ONLY */}
+              {categoryCardsList.map((cat) => (
+                <div
+                  key={cat.id}
+                  onClick={() => setSelectedCategoryId(cat.id)}
+                  className="bg-white p-6 rounded-3xl shadow-card border border-gray-100 cursor-pointer transition-all hover:border-[#8A2B43]/30 hover:scale-[1.02] hover:shadow-md group flex flex-col justify-between min-h-[160px]"
+                >
+                  <div className="flex items-start justify-between">
+                    <div className="w-12 h-12 rounded-2xl bg-pyjama-cream text-[#8A2B43] flex items-center justify-center border border-pyjama-pink/40 group-hover:bg-[#8A2B43] group-hover:text-white transition-colors">
+                      {cat.imageUrl ? (
+                        <img src={cat.imageUrl} alt={cat.name} className="w-full h-full object-cover rounded-2xl" />
+                      ) : (
+                        <Tag className="w-5 h-5" />
+                      )}
+                    </div>
 
-            {/* Dynamic Category Cards */}
-            {categoryCardsList.map((cat) => (
-              <div
-                key={cat.id}
-                onClick={() => setSelectedCategoryId(cat.id)}
-                className="bg-white p-6 rounded-3xl shadow-card border border-gray-100 cursor-pointer transition-all hover:border-[#8A2B43]/30 hover:scale-[1.02] hover:shadow-md group flex flex-col justify-between min-h-[160px]"
-              >
-                <div className="flex items-start justify-between">
-                  <div className="w-12 h-12 rounded-2xl bg-pyjama-cream text-[#8A2B43] flex items-center justify-center border border-pyjama-pink/40 group-hover:bg-[#8A2B43] group-hover:text-white transition-colors">
-                    {cat.imageUrl ? (
-                      <img src={cat.imageUrl} alt={cat.name} className="w-full h-full object-cover rounded-2xl" />
-                    ) : (
-                      <Tag className="w-5 h-5" />
-                    )}
+                    <span className="px-3 py-1 bg-pyjama-pink-soft text-[#8A2B43] rounded-full text-xs font-mono font-bold">
+                      {cat.count} منتجات
+                    </span>
                   </div>
 
-                  <span className="px-3 py-1 bg-pyjama-pink-soft text-[#8A2B43] rounded-full text-xs font-mono font-bold">
-                    {cat.count} منتجات
-                  </span>
+                  <div>
+                    <h4 className="text-base font-bold text-pyjama-charcoal group-hover:text-[#8A2B43] transition-colors">
+                      {cat.name}
+                    </h4>
+                    <p className="text-xs text-gray-400 mt-1 font-medium">اضغط لاستعراض كروت منتجات هذا القسم</p>
+                  </div>
                 </div>
-
-                <div>
-                  <h4 className="text-base font-bold text-pyjama-charcoal group-hover:text-[#8A2B43] transition-colors">
-                    {cat.name}
-                  </h4>
-                  <p className="text-xs text-gray-400 mt-1 font-medium">اضغط لاستعراض كروت منتجات هذا القسم</p>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </div>
       ) : (
-        /* LEVEL 2: Product Cards Grid View */
+        /* LEVEL 2: Product Cards Grid View (Clickable Cards for Edit) */
         <div className="space-y-6">
           {/* Back Action Bar */}
           <div className="flex items-center justify-between bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
@@ -171,7 +166,7 @@ export default function InventoryGrid({
             </span>
           </div>
 
-          {/* Product Cards Responsive CSS Grid */}
+          {/* Product Cards Grid */}
           {activeProducts.length === 0 ? (
             <div className="bg-white rounded-3xl p-12 text-center border border-gray-100 shadow-card space-y-4">
               <div className="w-16 h-16 rounded-3xl bg-pyjama-cream border border-pyjama-pink/40 text-[#8A2B43] flex items-center justify-center mx-auto shadow-sm">
@@ -179,7 +174,7 @@ export default function InventoryGrid({
               </div>
               <h3 className="text-lg font-bold text-pyjama-charcoal">لا توجد منتجات في هذا القسم حالياً</h3>
               <p className="text-xs text-gray-500 max-w-sm mx-auto">
-                اضغط على العودة للأقسام لتصفح بقية أقسام المخزون.
+                اضغط على زر العودة للأقسام لتصفح بقية أقسام المتجر.
               </p>
             </div>
           ) : (
@@ -190,7 +185,9 @@ export default function InventoryGrid({
                 return (
                   <div
                     key={product.id}
-                    className="bg-white rounded-3xl border border-gray-100 shadow-card hover:shadow-lg transition-all flex flex-col justify-between overflow-hidden group"
+                    onClick={() => onEditProduct && onEditProduct(product)}
+                    className="bg-white rounded-3xl border border-gray-100 shadow-card hover:shadow-xl hover:border-[#8A2B43]/40 transition-all flex flex-col justify-between overflow-hidden cursor-pointer group"
+                    title="انقر على الكارت لتعديل بيانات المنتج"
                   >
                     {/* Top Bar inside Card */}
                     <div className="p-4 bg-pyjama-cream/30 border-b border-gray-100 flex items-center justify-between">
@@ -198,9 +195,12 @@ export default function InventoryGrid({
                         {product.categoryNameAr || 'منتج عام'}
                       </span>
 
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] font-bold text-[#8A2B43] flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <Edit3 className="w-3 h-3" /> تعديل
+                        </span>
                         <button
-                          onClick={() => handleDelete(product.id, product.nameAr)}
+                          onClick={(e) => handleDelete(e, product.id, product.nameAr)}
                           className="p-1.5 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
                           title="حذف المنتج"
                         >
@@ -226,7 +226,7 @@ export default function InventoryGrid({
                         </div>
 
                         <div className="space-y-1 min-w-0 flex-1">
-                          <h4 className="text-sm font-bold text-pyjama-charcoal line-clamp-2 leading-tight">
+                          <h4 className="text-sm font-bold text-pyjama-charcoal line-clamp-2 leading-tight group-hover:text-[#8A2B43] transition-colors">
                             {product.nameAr}
                           </h4>
                           <span className="inline-block text-[11px] font-mono font-bold text-[#8A2B43] bg-pyjama-pink-soft/50 px-2 py-0.5 rounded-md">
@@ -243,7 +243,7 @@ export default function InventoryGrid({
                       </div>
 
                       {/* Inline Multi-Stock & Variant Controls per Color & Size */}
-                      <div className="space-y-3 pt-2 border-t border-gray-100">
+                      <div className="space-y-3 pt-2 border-t border-gray-100" onClick={(e) => e.stopPropagation()}>
                         <span className="text-xs font-bold text-gray-700 block">
                           المخزون الحالي حسب الألوان والمقاسات:
                         </span>
@@ -279,13 +279,14 @@ export default function InventoryGrid({
                                       <div className="flex items-center gap-1 dir-ltr">
                                         <button
                                           type="button"
-                                          onClick={() =>
+                                          onClick={(e) => {
+                                            e.stopPropagation();
                                             onUpdateStock(
                                               variant.id,
                                               activeStockTab,
                                               Math.max(0, stockVal - 1)
-                                            )
-                                          }
+                                            );
+                                          }}
                                           className="w-5 h-5 rounded-md bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold flex items-center justify-center text-xs transition-all"
                                         >
                                           -
@@ -299,13 +300,14 @@ export default function InventoryGrid({
                                         </span>
                                         <button
                                           type="button"
-                                          onClick={() =>
+                                          onClick={(e) => {
+                                            e.stopPropagation();
                                             onUpdateStock(
                                               variant.id,
                                               activeStockTab,
                                               stockVal + 1
-                                            )
-                                          }
+                                            );
+                                          }}
                                           className="w-5 h-5 rounded-md bg-[#8A2B43] hover:bg-[#7A1C32] text-white font-bold flex items-center justify-center text-xs transition-all shadow-xs"
                                         >
                                           +
@@ -321,7 +323,7 @@ export default function InventoryGrid({
                       </div>
                     </div>
 
-                    {/* Card Footer: Purchase Cost Price & Selling Price */}
+                    {/* Card Footer */}
                     <div className="p-4 bg-pyjama-cream/40 border-t border-gray-100 flex items-center justify-between text-xs font-mono">
                       <div>
                         <span className="text-[10px] text-gray-400 block font-sans">الشراء (Achat):</span>

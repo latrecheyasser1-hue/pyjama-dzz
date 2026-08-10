@@ -343,6 +343,12 @@ export default function MasterAdminPage() {
     setProducts((prev) => [newProduct, ...prev]);
   };
 
+  const handleUpdateProduct = (updatedProduct: Product) => {
+    setProducts((prev) =>
+      prev.map((p) => (p.id === updatedProduct.id ? updatedProduct : p))
+    );
+  };
+
   const handleDeleteProduct = async (productId: string) => {
     try {
       await supabase.from('products').delete().eq('id', productId);
@@ -527,6 +533,7 @@ export default function MasterAdminPage() {
             activeStockTab={activeStockTab}
             onUpdateStock={handleUpdateStock}
             onAddProduct={handleAddProduct}
+            onUpdateProduct={handleUpdateProduct}
             onDeleteProduct={handleDeleteProduct}
           />
         )}

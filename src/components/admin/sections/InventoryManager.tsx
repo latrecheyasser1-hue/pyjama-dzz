@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Search, Plus, PackageCheck } from 'lucide-react';
+import { Search, Plus } from 'lucide-react';
 import { Product, StockType, Category } from '@/types/admin';
 import AddProductModal from '@/components/admin/products/AddProductModal';
 import InventoryGrid from '@/components/admin/inventory/InventoryGrid';
@@ -13,6 +13,7 @@ interface InventoryManagerProps {
   onUpdateStock: (variantId: string, stockType: StockType, newQuantity: number) => void;
   onAddProduct?: (newProduct: Product) => void;
   onDeleteProduct?: (productId: string) => void;
+  onUpdateProduct?: (updatedProduct: Product) => void;
 }
 
 export default function InventoryManager({
@@ -22,9 +23,11 @@ export default function InventoryManager({
   onUpdateStock,
   onAddProduct,
   onDeleteProduct,
+  onUpdateProduct,
 }: InventoryManagerProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [productToEdit, setProductToEdit] = useState<Product | null>(null);
 
   const filteredProducts = products.filter((p) =>
     p.nameAr.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -44,9 +47,27 @@ export default function InventoryManager({
     }
   };
 
+  const handleOpenAddModal = () => {
+    setProductToEdit(null);
+    setIsAddModalOpen(true);
+  };
+
+  const handleEditProduct = (product: Product) => {
+    setProductToEdit(product);
+    setIsAddModalOpen(true);
+  };
+
   const handleProductCreated = (newProd: Product) => {
     if (onAddProduct) {
       onAddProduct(newProd);
+    }
+  };
+
+  const handleProductUpdated = (updatedProd: Product) => {
+    if (onUpdateProduct) {
+      onUpdateProduct(updatedProd);
+    } else if (onAddProduct) {
+      onAddProduct(updatedProd);
     }
   };
 
@@ -59,7 +80,7 @@ export default function InventoryManager({
             {getDynamicTitle(activeStockTab)}
           </h2>
           <p className="text-xs text-gray-500 font-medium">
-            متابعة دقيقة بكميات المخزون والمقاسات والألوان حسب الأقسام
+            انقر على أي قسم لاستعراض كروت المنتجات وتعديل مخزونها مباشرة
           </p>
         </div>
 
@@ -79,7 +100,7 @@ export default function InventoryManager({
 
           {/* Primary Burgundy Add Product Button */}
           <button
-            onClick={() => setIsAddModalOpen(true)}
+            onClick={handleOpenAddModal}
             className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#8A2B43] hover:bg-[#7A1C32] text-white text-xs font-bold shadow-md transition-all shrink-0"
           >
             <Plus className="w-4 h-4" />
@@ -95,13 +116,16 @@ export default function InventoryManager({
         activeStockTab={activeStockTab}
         onUpdateStock={onUpdateStock}
         onDeleteProduct={onDeleteProduct}
+        onEditProduct={handleEditProduct}
       />
 
-      {/* Add Product Modal */}
+      {/* Add / Edit Product Modal */}
       <AddProductModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onProductAdded={handleProductCreated}
+        onProductUpdated={handleProductUpdated}
+        productToEdit={productToEdit}
       />
     </div>
   );

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   X,
   Plus,
@@ -29,6 +29,8 @@ interface AddProductModalProps {
   isOpen: boolean;
   onClose: () => void;
   onProductAdded: (newProduct: Product) => void;
+  onProductUpdated?: (updatedProduct: Product) => void;
+  productToEdit?: Product | null;
 }
 
 export type SizeCategoryKey = 'CLOTHING' | 'SHOES' | 'LINGERIE';
@@ -63,9 +65,7 @@ interface ColorInputItem {
   colorName: string;
   colorHex: string;
   imageUrl: string;
-  // Size-specific Stock Quantities map: { 'S': 10, 'M': 15, 'L': 5 }
   sizeStocks: Record<string, number>;
-  // Active selected sizes for this color
   activeSizes: string[];
 }
 
@@ -73,6 +73,8 @@ export default function AddProductModal({
   isOpen,
   onClose,
   onProductAdded,
+  onProductUpdated,
+  productToEdit,
 }: AddProductModalProps) {
   // Basic Info Form State
   const [nameAr, setNameAr] = useState('');
@@ -116,6 +118,36 @@ export default function AddProductModal({
   const [isLoadingSuppliers, setIsLoadingLoadingSuppliers] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const isEditMode = !!productToEdit;
+
+  // Form Reset
+  const resetForm = () => {
+    setNameAr('');
+    setSelectedSupplierId('');
+    setSupplierName('');
+    setSupplierPhone('');
+    setSku('');
+    setCostPrice('');
+    setSellingPrice('');
+    setOldPrice('');
+    setWholesalePrice('');
+    setSizeCategory('CLOTHING');
+    setIsStandardSize(false);
+    setMinSize('S');
+    setMaxSize('XL');
+    setColors([
+      {
+        id: 'c-1',
+        colorName: 'Burgundy (عنابي)',
+        colorHex: '#8A2B43',
+        imageUrl: '',
+        sizeStocks: { S: 10, M: 10, L: 10, XL: 10 },
+        activeSizes: ['S', 'M', 'L', 'XL'],
+      },
+    ]);
+    setDescription('');
+  };
+
   // Fetch Categories & Registered Suppliers from Supabase DB
   useEffect(() => {
     if (!isOpen) return;
@@ -138,9 +170,6 @@ export default function AddProductModal({
             slug: item.slug,
           }));
           setCategories(mappedCats);
-          if (!categoryId && mappedCats.length > 0) {
-            setCategoryId(mappedCats[0].id);
-          }
         }
 
         // 2. Fetch Suppliers
@@ -169,6 +198,76 @@ export default function AddProductModal({
 
     fetchData();
   }, [isOpen]);
+
+  // Pre-fill Edit Mode Data
+  useEffect(() => {
+    if (!isOpen) return;
+
+    if (productToEdit) {
+      setNameAr(productToEdit.nameAr || '');
+      setCategoryId(productToEdit.categoryId || '');
+      setSupplierName(productToEdit.supplierName || '');
+      setSupplierPhone(productToEdit.supplierPhone || '');
+      setSku(productToEdit.sku || '');
+      setCostPrice(productToEdit.costPrice ?? '');
+      setSellingPrice(productToEdit.sellingPrice ?? '');
+      setOldPrice(productToEdit.oldPrice ?? '');
+      setWholesalePrice(productToEdit.wholesalePrice ?? '');
+      setDescription(productToEdit.description || '');
+
+      // Reconstruct color variants
+      if (productToEdit.colors && productToEdit.colors.length > 0) {
+        const colorItems: ColorInputItem[] = productToEdit.colors.map((c, idx) => {
+          const colorName = c.colorName;
+          const colorVariants = productToEdit.variants?.filter((v) => v.color === colorName) || [];
+          const activeSizes = colorVariants.map((v) => v.size);
+          const sizeStocks: Record<string, number> = {};
+
+          colorVariants.forEach((v) => {
+            sizeStocks[v.size] = v.deliveryStock;
+          });
+
+          return {
+            id: `c-edit-${idx}-${Date.now()}`,
+            colorName: colorName,
+            colorHex: '#8A2B43',
+            imageUrl: c.imageUrl || productToEdit.imageUrl || '',
+            sizeStocks,
+            activeSizes: activeSizes.length > 0 ? activeSizes : ['S', 'M', 'L', 'XL'],
+          };
+        });
+        setColors(colorItems);
+      } else if (productToEdit.variants && productToEdit.variants.length > 0) {
+        const colorGroups: Record<string, ProductVariant[]> = {};
+        productToEdit.variants.forEach((v) => {
+          const col = v.color || 'اللون الأساسي';
+          if (!colorGroups[col]) colorGroups[col] = [];
+          colorGroups[col].push(v);
+        });
+
+        const colorItems: ColorInputItem[] = Object.entries(colorGroups).map(([colName, vars], idx) => {
+          const sizeStocks: Record<string, number> = {};
+          const activeSizes: string[] = [];
+          vars.forEach((v) => {
+            activeSizes.push(v.size);
+            sizeStocks[v.size] = v.deliveryStock;
+          });
+
+          return {
+            id: `c-edit-v-${idx}-${Date.now()}`,
+            colorName: colName,
+            colorHex: '#8A2B43',
+            imageUrl: productToEdit.imageUrl || '',
+            sizeStocks,
+            activeSizes,
+          };
+        });
+        setColors(colorItems);
+      }
+    } else {
+      resetForm();
+    }
+  }, [isOpen, productToEdit]);
 
   // Handle Supplier Selection
   const handleSupplierChange = (supId: string) => {
@@ -209,30 +308,6 @@ export default function AddProductModal({
   };
 
   const generatedSizesList = getGeneratedSizes();
-
-  // Sync active sizes whenever generatedSizesList changes
-  useEffect(() => {
-    setColors((prevColors) =>
-      prevColors.map((color) => {
-        const newActive = color.activeSizes.filter((s) => generatedSizesList.includes(s));
-        const missing = generatedSizesList.filter((s) => !color.activeSizes.includes(s));
-        const updatedActive = [...newActive, ...missing];
-
-        const updatedStocks = { ...color.sizeStocks };
-        generatedSizesList.forEach((s) => {
-          if (updatedStocks[s] === undefined) {
-            updatedStocks[s] = 10;
-          }
-        });
-
-        return {
-          ...color,
-          activeSizes: updatedActive,
-          sizeStocks: updatedStocks,
-        };
-      })
-    );
-  }, [minSize, maxSize, sizeCategory, isStandardSize]);
 
   // Size Category Change
   const handleSizeCategoryChange = (catKey: SizeCategoryKey) => {
@@ -292,7 +367,7 @@ export default function AddProductModal({
         console.log('Eyedropper closed without selection');
       }
     } else {
-      alert('ميزة أداة القطارة غيرة مدعومة مباشرة في هذا المتصفح. استخدم العجلة الملونة بدلاً منها.');
+      alert('ميزة أداة القطارة غير مدعومة مباشرة في هذا المتصفح. استخدم العجلة الملونة بدلاً منها.');
     }
   };
 
@@ -300,11 +375,9 @@ export default function AddProductModal({
   const handleImageFileChange = async (colorId: string, file: File) => {
     if (!file) return;
 
-    // Instant local preview
     const localUrl = URL.createObjectURL(file);
     handleUpdateColor(colorId, 'imageUrl', localUrl);
 
-    // Upload to Supabase Storage
     try {
       const fileExt = file.name.split('.').pop() || 'jpg';
       const fileName = `color-${Date.now()}-${Math.random().toString(36).substring(2, 6)}.${fileExt}`;
@@ -378,34 +451,6 @@ export default function AddProductModal({
     return null;
   };
 
-  // Form Reset
-  const resetForm = () => {
-    setNameAr('');
-    setSelectedSupplierId('');
-    setSupplierName('');
-    setSupplierPhone('');
-    setSku('');
-    setCostPrice('');
-    setSellingPrice('');
-    setOldPrice('');
-    setWholesalePrice('');
-    setSizeCategory('CLOTHING');
-    setIsStandardSize(false);
-    setMinSize('S');
-    setMaxSize('XL');
-    setColors([
-      {
-        id: 'c-1',
-        colorName: 'Burgundy (عنابي)',
-        colorHex: '#8A2B43',
-        imageUrl: '',
-        sizeStocks: { S: 10, M: 10, L: 10, XL: 10 },
-        activeSizes: ['S', 'M', 'L', 'XL'],
-      },
-    ]);
-    setDescription('');
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -445,40 +490,59 @@ export default function AddProductModal({
         image_url: activeColors[0]?.imageUrl || null,
       };
 
-      // 2. Insert into Supabase `products` table
-      let insertedProductId = `prod-${Date.now()}`;
-      const { data: prodData, error: prodError } = await supabase
-        .from('products')
-        .insert([productPayload])
-        .select();
+      const selectedCat = categories.find((cat) => cat.id === categoryId);
 
-      if (prodError) {
-        console.warn('Supabase product insert notice:', prodError.message || prodError);
-      } else if (prodData && prodData.length > 0) {
-        insertedProductId = String(prodData[0].id);
+      const generatedVariants: ProductVariant[] = [];
+      activeColors.forEach((c) => {
+        c.activeSizes.forEach((s) => {
+          const stockVal = c.sizeStocks[s] !== undefined ? c.sizeStocks[s] : 10;
+          generatedVariants.push({
+            id: `v-${Date.now()}-${c.colorName}-${s}`,
+            productId: isEditMode && productToEdit ? productToEdit.id : '',
+            size: s,
+            color: c.colorName.trim(),
+            deliveryStock: stockVal,
+            storeStock: stockVal,
+            wholesaleStock: stockVal,
+          });
+        });
+      });
 
-        // 3. Insert Child `product_colors`
+      if (isEditMode && productToEdit) {
+        // UPDATE existing product
+        const { error: updateErr } = await supabase
+          .from('products')
+          .update(productPayload)
+          .eq('id', productToEdit.id);
+
+        if (updateErr) {
+          console.warn('Supabase product update notice:', updateErr.message || updateErr);
+        }
+
+        // Clean & Re-insert child tables
+        await supabase.from('product_colors').delete().eq('product_id', productToEdit.id);
+        await supabase.from('product_sizes').delete().eq('product_id', productToEdit.id);
+        await supabase.from('product_variants').delete().eq('product_id', productToEdit.id);
+
         const colorRows = activeColors.map((c) => ({
-          product_id: insertedProductId,
+          product_id: productToEdit.id,
           color_name: c.colorName.trim(),
           image_url: c.imageUrl.trim() || null,
         }));
         await supabase.from('product_colors').insert(colorRows);
 
-        // 4. Insert Child `product_sizes`
         const sizeRows = generatedSizesList.map((s) => ({
-          product_id: insertedProductId,
+          product_id: productToEdit.id,
           size_name: s,
         }));
         await supabase.from('product_sizes').insert(sizeRows);
 
-        // 5. Insert Child `product_variants` (Color x Active Sizes x Custom Stock Quantities)
         const variantRows: any[] = [];
         activeColors.forEach((c) => {
           c.activeSizes.forEach((s) => {
             const stockVal = c.sizeStocks[s] !== undefined ? c.sizeStocks[s] : 10;
             variantRows.push({
-              product_id: insertedProductId,
+              product_id: productToEdit.id,
               color_name: c.colorName.trim(),
               size_name: s,
               delivery_stock: stockVal,
@@ -491,51 +555,101 @@ export default function AddProductModal({
         if (variantRows.length > 0) {
           await supabase.from('product_variants').insert(variantRows);
         }
+
+        const updatedProdObj: Product = {
+          ...productToEdit,
+          sku: finalSku,
+          nameAr: nameAr.trim(),
+          categoryId: categoryId || undefined,
+          categoryNameAr: selectedCat?.name || undefined,
+          supplierName: supplierName.trim() || undefined,
+          supplierPhone: supplierPhone.trim() || undefined,
+          costPrice: Number(costPrice) || 0,
+          sellingPrice: Number(sellingPrice) || 0,
+          oldPrice: oldPrice !== '' ? Number(oldPrice) : null,
+          wholesalePrice: wholesalePrice !== '' ? Number(wholesalePrice) : null,
+          description: description.trim() || undefined,
+          imageUrl: activeColors[0]?.imageUrl || undefined,
+          colors: activeColors.map((c) => ({ colorName: c.colorName, imageUrl: c.imageUrl })),
+          sizes: generatedSizesList,
+          variants: generatedVariants,
+        };
+
+        if (onProductUpdated) {
+          onProductUpdated(updatedProdObj);
+        } else {
+          onProductAdded(updatedProdObj);
+        }
+      } else {
+        // INSERT new product
+        let insertedProductId = `prod-${Date.now()}`;
+        const { data: prodData, error: prodError } = await supabase
+          .from('products')
+          .insert([productPayload])
+          .select();
+
+        if (!prodError && prodData && prodData.length > 0) {
+          insertedProductId = String(prodData[0].id);
+
+          const colorRows = activeColors.map((c) => ({
+            product_id: insertedProductId,
+            color_name: c.colorName.trim(),
+            image_url: c.imageUrl.trim() || null,
+          }));
+          await supabase.from('product_colors').insert(colorRows);
+
+          const sizeRows = generatedSizesList.map((s) => ({
+            product_id: insertedProductId,
+            size_name: s,
+          }));
+          await supabase.from('product_sizes').insert(sizeRows);
+
+          const variantRows: any[] = [];
+          activeColors.forEach((c) => {
+            c.activeSizes.forEach((s) => {
+              const stockVal = c.sizeStocks[s] !== undefined ? c.sizeStocks[s] : 10;
+              variantRows.push({
+                product_id: insertedProductId,
+                color_name: c.colorName.trim(),
+                size_name: s,
+                delivery_stock: stockVal,
+                store_stock: stockVal,
+                wholesale_stock: stockVal,
+              });
+            });
+          });
+
+          if (variantRows.length > 0) {
+            await supabase.from('product_variants').insert(variantRows);
+          }
+        }
+
+        const newProduct: Product = {
+          id: insertedProductId,
+          sku: finalSku,
+          nameAr: nameAr.trim(),
+          categoryId: categoryId || undefined,
+          categoryNameAr: selectedCat?.name || undefined,
+          supplierName: supplierName.trim() || undefined,
+          supplierPhone: supplierPhone.trim() || undefined,
+          costPrice: Number(costPrice) || 0,
+          sellingPrice: Number(sellingPrice) || 0,
+          oldPrice: oldPrice !== '' ? Number(oldPrice) : null,
+          wholesalePrice: wholesalePrice !== '' ? Number(wholesalePrice) : null,
+          description: description.trim() || undefined,
+          imageUrl: activeColors[0]?.imageUrl || undefined,
+          colors: activeColors.map((c) => ({ colorName: c.colorName, imageUrl: c.imageUrl })),
+          sizes: generatedSizesList,
+          variants: generatedVariants,
+        };
+
+        onProductAdded(newProduct);
       }
 
-      // 6. Build Local Product Object for instant UI sync
-      const generatedVariants: ProductVariant[] = [];
-      activeColors.forEach((c) => {
-        c.activeSizes.forEach((s) => {
-          const stockVal = c.sizeStocks[s] !== undefined ? c.sizeStocks[s] : 10;
-          generatedVariants.push({
-            id: `v-${Date.now()}-${c.colorName}-${s}`,
-            productId: insertedProductId,
-            size: s,
-            color: c.colorName.trim(),
-            deliveryStock: stockVal,
-            storeStock: stockVal,
-            wholesaleStock: stockVal,
-          });
-        });
-      });
-
-      const selectedCat = categories.find((cat) => cat.id === categoryId);
-
-      const newProduct: Product = {
-        id: insertedProductId,
-        sku: finalSku,
-        nameAr: nameAr.trim(),
-        categoryId: categoryId || undefined,
-        categoryNameAr: selectedCat?.name || undefined,
-        supplierName: supplierName.trim() || undefined,
-        supplierPhone: supplierPhone.trim() || undefined,
-        costPrice: Number(costPrice) || 0,
-        sellingPrice: Number(sellingPrice) || 0,
-        oldPrice: oldPrice !== '' ? Number(oldPrice) : null,
-        wholesalePrice: wholesalePrice !== '' ? Number(wholesalePrice) : null,
-        description: description.trim() || undefined,
-        imageUrl: activeColors[0]?.imageUrl || undefined,
-        colors: activeColors.map((c) => ({ colorName: c.colorName, imageUrl: c.imageUrl })),
-        sizes: generatedSizesList,
-        variants: generatedVariants,
-      };
-
-      onProductAdded(newProduct);
       resetForm();
       onClose();
     } catch (err: any) {
-      console.error('Error adding product:', err);
+      console.error('Error saving product:', err);
       alert('حدث خطأ أثناء حفظ المنتج: ' + (err?.message || String(err)));
     } finally {
       setIsSubmitting(false);
@@ -557,9 +671,11 @@ export default function AddProductModal({
               <Package className="w-5 h-5 text-pyjama-pink" />
             </div>
             <div>
-              <h2 className="text-lg sm:text-xl font-bold">إضافة منتج جديد (Add New Product)</h2>
+              <h2 className="text-lg sm:text-xl font-bold">
+                {isEditMode ? 'تعديل بيانات المنتج (Edit Product)' : 'إضافة منتج جديد (Add New Product)'}
+              </h2>
               <p className="text-xs text-white/80 mt-0.5">
-                رفع الصور المباشر، قطارة الألوان، وتحديد كميات المقاسات لكل لون
+                {isEditMode ? 'تحديث الأسعار والألوان والمقاسات والموردين' : 'رفع الصور المباشر، قطارة الألوان، وتحديد كميات المقاسات لكل لون'}
               </p>
             </div>
           </div>
@@ -927,7 +1043,6 @@ export default function AddProductModal({
 
                       {/* Eyedropper & Color Picker */}
                       <div className="flex items-center gap-1.5 shrink-0">
-                        {/* Native Color Picker */}
                         <input
                           type="color"
                           value={colorItem.colorHex || '#8A2B43'}
@@ -936,7 +1051,6 @@ export default function AddProductModal({
                           title="عجلة الألوان"
                         />
 
-                        {/* Browser Eyedropper API Button */}
                         <button
                           type="button"
                           onClick={() => handleOpenEyedropper(colorItem.id)}
@@ -1022,7 +1136,6 @@ export default function AddProductModal({
                         المقاسات والكميات المتوفرة للون ({colorItem.colorName || `لون ${index + 1}`}):
                       </span>
 
-                      {/* Quick Action Buttons for Sizes */}
                       <div className="flex items-center gap-2">
                         <button
                           type="button"
@@ -1131,11 +1244,15 @@ export default function AddProductModal({
               className="flex items-center gap-2 px-7 py-3 rounded-2xl bg-[#8A2B43] hover:bg-[#7A1C32] text-white text-xs font-bold shadow-lg hover:shadow-xl transition-all disabled:opacity-50"
             >
               {isSubmitting ? (
-                <span>جاري حفظ المنتج...</span>
+                <span>جاري الحفظ...</span>
               ) : (
                 <>
                   <CheckCircle className="w-4 h-4" />
-                  <span>حفظ المنتج في قاعدة البيانات (Save Product)</span>
+                  <span>
+                    {isEditMode
+                      ? 'تحديث وتعديل المنتج (Update Product)'
+                      : 'حفظ المنتج في قاعدة البيانات (Save Product)'}
+                  </span>
                 </>
               )}
             </button>
