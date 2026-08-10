@@ -39,9 +39,11 @@ export interface AdminSettings {
 
 export interface Category {
   id: string;
-  nameAr: string;
-  nameFr: string;
+  name: string;
+  nameAr?: string;
+  nameFr?: string;
   slug: string;
+  coverImageUrl?: string;
   createdAt?: string;
 }
 

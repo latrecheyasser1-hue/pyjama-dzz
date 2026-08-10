@@ -58,10 +58,10 @@ const initialSettings: AdminSettings = {
 };
 
 const initialCategories: Category[] = [
-  { id: 'cat-1', nameAr: 'بيجامات حريرية', nameFr: 'Pyjamas Hiver', slug: 'pyjamas-hiver' },
-  { id: 'cat-2', nameAr: 'ملابس النوم', nameFr: 'Nuisettes & Lingerie', slug: 'nuisettes-lingerie' },
-  { id: 'cat-3', nameAr: 'أحذية داخلية', nameFr: 'Chaussons & Pantoufles', slug: 'chaussons' },
-  { id: 'cat-4', nameAr: 'روب دو شامبر', nameFr: 'Peignoirs & Robes', slug: 'peignoirs' },
+  { id: 'cat-1', name: 'بيجامات حريرية', slug: 'pyjamas-silk' },
+  { id: 'cat-2', name: 'ملابس النوم (Nuisettes & Lingerie)', slug: 'nuisettes-lingerie' },
+  { id: 'cat-3', name: 'أحذية داخلية (Chaussons)', slug: 'chaussons' },
+  { id: 'cat-4', name: 'روب دو شامبر (Peignoirs)', slug: 'peignoirs' },
 ];
 
 const initialSuppliers: Supplier[] = [
@@ -299,12 +299,11 @@ export default function MasterAdminPage() {
     );
   };
 
-  const handleAddCategory = (nameAr: string, nameFr: string) => {
+  const handleAddCategory = (name: string) => {
     const newCat: Category = {
       id: `cat-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
-      nameAr,
-      nameFr,
-      slug: nameFr.toLowerCase().replace(/\s+/g, '-'),
+      name,
+      slug: name.toLowerCase().trim().replace(/\s+/g, '-'),
     };
     setCategories((prev) => [...prev, newCat]);
   };
@@ -427,6 +426,7 @@ export default function MasterAdminPage() {
         {activeSection === 'CATEGORIES' && (
           <CategoriesManager
             categories={categories}
+            products={products}
             onAddCategory={handleAddCategory}
             onDeleteCategory={handleDeleteCategory}
           />
