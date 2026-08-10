@@ -105,33 +105,8 @@ const initialCustomers: Customer[] = [
   },
 ];
 
-const initialProducts: Product[] = [
-  {
-    id: 'prod-1',
-    sku: 'PYJ-SILK-01',
-    nameAr: 'بيجاما حرير صيفي راقية',
-    categoryId: 'cat-1',
-    categoryNameAr: 'بيجامات حريرية',
-    costPrice: 2800,
-    sellingPrice: 5500,
-    variants: [
-      { id: 'v1', productId: 'prod-1', size: 'M', color: 'زهري (Burgundy)', deliveryStock: 12, storeStock: 8, wholesaleStock: 25 },
-      { id: 'v2', productId: 'prod-1', size: 'L', color: 'زهري (Burgundy)', deliveryStock: 2, storeStock: 5, wholesaleStock: 10 },
-    ],
-  },
-  {
-    id: 'prod-2',
-    sku: 'ROB-VELVET-02',
-    nameAr: 'روب مخملي شتوي مطرّز',
-    categoryId: 'cat-4',
-    categoryNameAr: 'روب دو شامبر',
-    costPrice: 4200,
-    sellingPrice: 8900,
-    variants: [
-      { id: 'v3', productId: 'prod-2', size: 'XL', color: 'وردي ناعم (Dusty Pink)', deliveryStock: 15, storeStock: 10, wholesaleStock: 30 },
-    ],
-  },
-];
+// Clean Empty Products Array ready for real Supabase data insertion
+const initialProducts: Product[] = [];
 
 // Detailed Seed Orders for Retail & Wholesale
 const initialDetailedOrders: DetailedOrder[] = [
