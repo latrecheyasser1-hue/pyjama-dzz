@@ -363,16 +363,20 @@ export default function AddProductModal({
           const specificVariantImg = colorVariants.find(
             (v: any) => v.color_image_url || v.colorImageUrl
           );
-          const specificColorImg =
-            specificVariantImg?.color_image_url ||
-            specificVariantImg?.colorImageUrl ||
-            c.imageUrl;
+
+          const foundVarImg = specificVariantImg?.color_image_url || specificVariantImg?.colorImageUrl;
+          const candidateImg = foundVarImg || c.imageUrl;
+
+          // PRESERVE NULL/EMPTY IF CANDIDATE MATCHES MAIN PRODUCT IMAGE TO PREVENT DUPLICATION!
+          const mainProdImg = productToEdit.imageUrl || (productToEdit as any).image_url;
+          const isMainImageDuplicate = !foundVarImg && candidateImg && mainProdImg && candidateImg === mainProdImg;
+          const specificColorImg = isMainImageDuplicate ? '' : (candidateImg || '');
 
           return {
             id: `c-edit-${idx}-${Date.now()}`,
             colorName: colorName,
             colorHex: '#ffffff',
-            imageUrl: specificColorImg || '', // Strictly specific color image only!
+            imageUrl: specificColorImg, // Strictly specific color image only!
             deliveryStocks: delStocks,
             storeStocks: storeStocks,
             wholesaleStocks: wsStocks,

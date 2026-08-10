@@ -293,6 +293,8 @@ export default function MasterAdminPage() {
                 productId: String(v.product_id),
                 size: v.size || v.size_name || 'Standard',
                 color: v.color_name || v.color || 'أساسي',
+                color_image_url: v.color_image_url || v.colorImageUrl || undefined,
+                colorImageUrl: v.color_image_url || v.colorImageUrl || undefined,
                 deliveryStock: Number(v.delivery_stock) || 0,
                 storeStock: Number(v.store_stock) || 0,
                 wholesaleStock: Number(v.wholesale_stock) || 0,
@@ -305,7 +307,7 @@ export default function MasterAdminPage() {
         if (varData) {
           varData.filter((v: any) => String(v.product_id) === String(p.id)).forEach((v: any) => {
             const col = v.color_name || v.color;
-            const img = v.color_image_url || v.imageUrl;
+            const img = v.color_image_url || v.colorImageUrl || v.imageUrl;
             if (col && img && !colorMap.has(col)) {
               colorMap.set(col, img);
             }
@@ -316,7 +318,7 @@ export default function MasterAdminPage() {
         pVariants.forEach((v) => colorsSet.add(v.color));
         const colors = Array.from(colorsSet).map((cName) => ({
           colorName: cName,
-          imageUrl: colorMap.get(cName) || p.image_url || undefined,
+          imageUrl: colorMap.get(cName) || undefined, // STRICTLY SPECIFIC COLOR IMAGE ONLY - DO NOT FALLBACK TO p.image_url!
         }));
 
         const sizesSet = new Set<string>();
