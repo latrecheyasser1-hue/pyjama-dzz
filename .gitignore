@@ -21,8 +21,12 @@ env/
 venv/
 ENV/
 
-# Environment & IDE
+# Environment & Secrets (NEVER push to git)
 .env
-.env.local
+.env.*
+!.env.example
+*.env
+*.pem
+*.key
 .vscode/
 .idea/
