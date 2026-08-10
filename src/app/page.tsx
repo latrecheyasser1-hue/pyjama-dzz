@@ -98,7 +98,6 @@ const initialCustomers: Customer[] = [
   },
 ];
 
-// Clean Empty Products Array ready for real Supabase data insertion
 const initialProducts: Product[] = [];
 
 // Detailed Seed Orders for Retail & Wholesale
@@ -297,7 +296,8 @@ export default function MasterAdminPage() {
                 deliveryStock: Number(v.delivery_stock) || 0,
                 storeStock: Number(v.store_stock) || 0,
                 wholesaleStock: Number(v.wholesale_stock) || 0,
-                isSurCommande: v.is_sur_commande ?? false,
+                serieComposition: v.serie_composition || undefined,
+                wholesaleSeriesQty: v.wholesale_series_qty !== undefined ? Number(v.wholesale_series_qty) : undefined,
               }))
           : [];
 
@@ -327,7 +327,6 @@ export default function MasterAdminPage() {
           unitsPerSerie: p.units_per_serie ? Number(p.units_per_serie) : 4,
           minWholesaleSeries: p.min_wholesale_series ? Number(p.min_wholesale_series) : 1,
           superGrosThreshold: p.super_gros_threshold ? Number(p.super_gros_threshold) : 10,
-          isSurCommande: p.is_sur_commande ?? false,
           description: p.description || undefined,
           imageUrl: p.image_url || undefined,
           colors: colors,
@@ -348,7 +347,7 @@ export default function MasterAdminPage() {
     fetchProducts();
   }, [fetchCategories, fetchSuppliers, fetchProducts]);
 
-  // Real-time Order Notification Callback (strictly triggered ONLY by genuine Supabase DB inserts)
+  // Real-time Order Notification Callback
   const handleRealtimeNewOrder = useCallback((rawOrder: any) => {
     if (!rawOrder) return;
     const uniqueId = rawOrder.id || `ord-rt-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
@@ -374,16 +373,13 @@ export default function MasterAdminPage() {
     setOrders((prev) => [newOrder, ...prev]);
   }, [orders.length]);
 
-  // Hook Initialization (Always On sound notifications)
   const {
     toastAlerts,
     dismissToast,
   } = useOrderNotification(handleRealtimeNewOrder);
 
-  // Unconfirmed Orders Count
   const unconfirmedOrders = orders.filter((o) => o.status === 'UNCONFIRMED');
 
-  // Action Handlers
   const handleConfirmOrder = (id: string) => {
     setOrders((prev) =>
       prev.map((o) => (o.id === id ? { ...o, status: 'CONFIRMED' as OrderStatus } : o))
@@ -411,7 +407,6 @@ export default function MasterAdminPage() {
       }))
     );
 
-    // Sync with Supabase `product_variants` table
     try {
       const column = stockType === 'DELIVERY' ? 'delivery_stock' : stockType === 'STORE' ? 'store_stock' : 'wholesale_stock';
       await supabase.from('product_variants').update({ [column]: newQuantity }).eq('id', variantId);
@@ -439,7 +434,6 @@ export default function MasterAdminPage() {
     }
   };
 
-  // Synchronous Supabase Insert with explicit Error Handling & Re-fetch
   const handleAddCategory = async (name: string): Promise<boolean> => {
     if (!name.trim()) return false;
 
@@ -455,7 +449,6 @@ export default function MasterAdminPage() {
         return false;
       }
 
-      console.log('Category saved successfully:', data);
       await fetchCategories();
       return true;
     } catch (err: any) {
@@ -465,7 +458,6 @@ export default function MasterAdminPage() {
     }
   };
 
-  // Synchronous Supabase Delete with explicit Error Handling & Re-fetch
   const handleDeleteCategory = async (id: string): Promise<boolean> => {
     try {
       const { error } = await supabase.from('categories').delete().eq('id', id);
@@ -483,7 +475,6 @@ export default function MasterAdminPage() {
     }
   };
 
-  // Synchronous Supabase Supplier Add
   const handleAddSupplier = async (supplier: { name: string; phone: string }): Promise<boolean> => {
     if (!supplier.name.trim() || !supplier.phone.trim()) return false;
 
@@ -499,7 +490,6 @@ export default function MasterAdminPage() {
         return false;
       }
 
-      console.log('Supplier saved successfully:', data);
       await fetchSuppliers();
       return true;
     } catch (err: any) {
@@ -509,7 +499,6 @@ export default function MasterAdminPage() {
     }
   };
 
-  // Synchronous Supabase Supplier Delete
   const handleDeleteSupplier = async (id: string): Promise<boolean> => {
     try {
       const { error } = await supabase.from('suppliers').delete().eq('id', id);
@@ -556,7 +545,6 @@ export default function MasterAdminPage() {
     );
   }
 
-  // Convert DetailedOrder to base Order type for OrderHistoryArchive & Analytics
   const baseOrders: Order[] = orders.map((o) => ({
     id: o.id,
     sequentialId: o.sequentialId,
@@ -586,7 +574,6 @@ export default function MasterAdminPage() {
 
       {/* Main Content Area */}
       <main className="flex-1 lg:mr-72 p-4 sm:p-6 lg:p-8 space-y-6">
-        {/* Mobile-Only Drawer Toggle Button */}
         <div className="lg:hidden flex items-center justify-between bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
           <button
             onClick={() => setIsMobileSidebarOpen(true)}
@@ -598,7 +585,6 @@ export default function MasterAdminPage() {
           <span className="text-xs font-bold text-[#8A2B43] font-mono">Pyjama DZ</span>
         </div>
 
-        {/* Section View Router */}
         {activeSection === 'NEW_ORDERS' && (
           <NewOrdersTicker
             orders={orders}
@@ -673,13 +659,11 @@ export default function MasterAdminPage() {
         )}
       </main>
 
-      {/* Visual Toast Notification Overlay */}
       <ToastNotificationContainer
         toastAlerts={toastAlerts}
         onDismissToast={dismissToast}
       />
 
-      {/* PIN Password Change Modal */}
       <PinChangeModal
         isOpen={isPinModalOpen}
         onClose={() => setIsPinModalOpen(false)}

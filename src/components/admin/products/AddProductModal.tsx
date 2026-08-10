@@ -20,11 +20,8 @@ import {
   Pipette,
   UploadCloud,
   Check,
-  ShoppingBag,
-  Store,
   Boxes,
-  HelpCircle,
-  Clock,
+  Layers,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import { Category, Product, ProductVariant, Supplier, StockType } from '@/types/admin';
@@ -75,6 +72,9 @@ interface ColorInputItem {
   deliveryStocks: Record<string, number>;
   storeStocks: Record<string, number>;
   wholesaleStocks: Record<string, number>;
+  // Wholesale Serie Composition per Color
+  serieComposition: Record<string, number>; // { S: 2, M: 2, L: 2, XL: 2 }
+  wholesaleSeriesQty: number; // Available Séries Count in Stock
   activeSizes: string[];
 }
 
@@ -102,11 +102,9 @@ export default function AddProductModal({
   const [wholesalePrice, setWholesalePrice] = useState<number | ''>('');
   const [superGrosPrice, setSuperGrosPrice] = useState<number | ''>('');
 
-  // Advanced Wholesale System State
-  const [unitsPerSerie, setUnitsPerSerie] = useState<number>(4);
+  // Wholesale System Thresholds State
   const [minWholesaleSeries, setMinWholesaleSeries] = useState<number>(1);
   const [superGrosThreshold, setSuperGrosThreshold] = useState<number>(10);
-  const [isSurCommande, setIsSurCommande] = useState<boolean>(false);
 
   // Flexible Size System State
   const [sizeCategory, setSizeCategory] = useState<SizeCategoryKey>('CLOTHING');
@@ -124,6 +122,8 @@ export default function AddProductModal({
       deliveryStocks: { S: 10, M: 10, L: 10, XL: 10 },
       storeStocks: { S: 5, M: 5, L: 5, XL: 5 },
       wholesaleStocks: { S: 20, M: 20, L: 20, XL: 20 },
+      serieComposition: { S: 2, M: 2, L: 2, XL: 2 },
+      wholesaleSeriesQty: 10,
       activeSizes: ['S', 'M', 'L', 'XL'],
     },
   ]);
@@ -152,10 +152,8 @@ export default function AddProductModal({
     setOldPrice('');
     setWholesalePrice('');
     setSuperGrosPrice('');
-    setUnitsPerSerie(4);
     setMinWholesaleSeries(1);
     setSuperGrosThreshold(10);
-    setIsSurCommande(false);
     setSizeCategory('CLOTHING');
     setIsStandardSize(false);
     setMinSize('S');
@@ -169,6 +167,8 @@ export default function AddProductModal({
         deliveryStocks: { S: 10, M: 10, L: 10, XL: 10 },
         storeStocks: { S: 5, M: 5, L: 5, XL: 5 },
         wholesaleStocks: { S: 20, M: 20, L: 20, XL: 20 },
+        serieComposition: { S: 2, M: 2, L: 2, XL: 2 },
+        wholesaleSeriesQty: 10,
         activeSizes: ['S', 'M', 'L', 'XL'],
       },
     ]);
@@ -239,10 +239,8 @@ export default function AddProductModal({
       setOldPrice(productToEdit.oldPrice ?? '');
       setWholesalePrice(productToEdit.wholesalePrice ?? '');
       setSuperGrosPrice(productToEdit.superGrosPrice ?? '');
-      setUnitsPerSerie(productToEdit.unitsPerSerie ?? 4);
       setMinWholesaleSeries(productToEdit.minWholesaleSeries ?? 1);
       setSuperGrosThreshold(productToEdit.superGrosThreshold ?? 10);
-      setIsSurCommande(productToEdit.isSurCommande ?? false);
       setDescription(productToEdit.description || '');
 
       if (productToEdit.colors && productToEdit.colors.length > 0) {
@@ -253,11 +251,21 @@ export default function AddProductModal({
           const delStocks: Record<string, number> = {};
           const storeStocks: Record<string, number> = {};
           const wsStocks: Record<string, number> = {};
+          const serieComp: Record<string, number> = {};
+          let wsSeriesCount = 10;
 
           colorVariants.forEach((v) => {
             delStocks[v.size] = v.deliveryStock;
             storeStocks[v.size] = v.storeStock;
             wsStocks[v.size] = v.wholesaleStock;
+            if (v.serieComposition && typeof v.serieComposition === 'object') {
+              Object.assign(serieComp, v.serieComposition);
+            } else {
+              serieComp[v.size] = 2;
+            }
+            if (v.wholesaleSeriesQty !== undefined) {
+              wsSeriesCount = v.wholesaleSeriesQty;
+            }
           });
 
           return {
@@ -268,6 +276,8 @@ export default function AddProductModal({
             deliveryStocks: delStocks,
             storeStocks: storeStocks,
             wholesaleStocks: wsStocks,
+            serieComposition: Object.keys(serieComp).length > 0 ? serieComp : { S: 2, M: 2, L: 2, XL: 2 },
+            wholesaleSeriesQty: wsSeriesCount,
             activeSizes: activeSizes.length > 0 ? activeSizes : ['S', 'M', 'L', 'XL'],
           };
         });
@@ -284,13 +294,23 @@ export default function AddProductModal({
           const delStocks: Record<string, number> = {};
           const storeStocks: Record<string, number> = {};
           const wsStocks: Record<string, number> = {};
+          const serieComp: Record<string, number> = {};
           const activeSizes: string[] = [];
+          let wsSeriesCount = 10;
 
           vars.forEach((v) => {
             activeSizes.push(v.size);
             delStocks[v.size] = v.deliveryStock;
             storeStocks[v.size] = v.storeStock;
             wsStocks[v.size] = v.wholesaleStock;
+            if (v.serieComposition && typeof v.serieComposition === 'object') {
+              Object.assign(serieComp, v.serieComposition);
+            } else {
+              serieComp[v.size] = 2;
+            }
+            if (v.wholesaleSeriesQty !== undefined) {
+              wsSeriesCount = v.wholesaleSeriesQty;
+            }
           });
 
           return {
@@ -301,6 +321,8 @@ export default function AddProductModal({
             deliveryStocks: delStocks,
             storeStocks: storeStocks,
             wholesaleStocks: wsStocks,
+            serieComposition: Object.keys(serieComp).length > 0 ? serieComp : { S: 2, M: 2, L: 2, XL: 2 },
+            wholesaleSeriesQty: wsSeriesCount,
             activeSizes,
           };
         });
@@ -370,11 +392,13 @@ export default function AddProductModal({
     const initDel: Record<string, number> = {};
     const initStore: Record<string, number> = {};
     const initWs: Record<string, number> = {};
+    const initSerieComp: Record<string, number> = {};
 
     generatedSizesList.forEach((s) => {
       initDel[s] = 10;
       initStore[s] = 5;
       initWs[s] = 20;
+      initSerieComp[s] = 2;
     });
 
     setColors((prev) => [
@@ -387,6 +411,8 @@ export default function AddProductModal({
         deliveryStocks: initDel,
         storeStocks: initStore,
         wholesaleStocks: initWs,
+        serieComposition: initSerieComp,
+        wholesaleSeriesQty: 10,
         activeSizes: [...generatedSizesList],
       },
     ]);
@@ -476,17 +502,12 @@ export default function AddProductModal({
     );
   };
 
-  // Update Stock Quantities for currently active warehouse
+  // Update Stock Quantities for Retail (Delivery/Store)
   const handleUpdateStockQuantity = (colorId: string, size: string, qty: number) => {
     setColors((prev) =>
       prev.map((c) => {
         if (c.id !== colorId) return c;
-        const targetMapKey =
-          activeWarehouse === 'DELIVERY'
-            ? 'deliveryStocks'
-            : activeWarehouse === 'STORE'
-            ? 'storeStocks'
-            : 'wholesaleStocks';
+        const targetMapKey = activeWarehouse === 'DELIVERY' ? 'deliveryStocks' : 'storeStocks';
 
         return {
           ...c,
@@ -497,6 +518,30 @@ export default function AddProductModal({
         };
       })
     );
+  };
+
+  // Update Serie Composition per size for ONE single Serie
+  const handleUpdateSerieSizeComposition = (colorId: string, size: string, count: number) => {
+    setColors((prev) =>
+      prev.map((c) => {
+        if (c.id !== colorId) return c;
+        return {
+          ...c,
+          serieComposition: {
+            ...c.serieComposition,
+            [size]: Math.max(0, count),
+          },
+        };
+      })
+    );
+  };
+
+  // Helper to calculate total items per 1 Serie for a color
+  const getSerieTotalItems = (colorItem: ColorInputItem): number => {
+    return colorItem.activeSizes.reduce((sum, size) => {
+      const count = colorItem.serieComposition[size] !== undefined ? colorItem.serieComposition[size] : 2;
+      return sum + count;
+    }, 0);
   };
 
   const calculateDiscountPercentage = (): number | null => {
@@ -522,7 +567,8 @@ export default function AddProductModal({
       delivery_stock: r.delivery_stock,
       store_stock: r.store_stock,
       wholesale_stock: r.wholesale_stock,
-      is_sur_commande: r.is_sur_commande,
+      serie_composition: r.serie_composition,
+      wholesale_series_qty: r.wholesale_series_qty,
     }));
 
     let { error: err1 } = await supabase.from('product_variants').insert(fallbackRows1);
@@ -587,6 +633,8 @@ export default function AddProductModal({
       }
 
       // Build Context-Isolated Base Product Payload
+      const firstColorTotalItemsInSerie = activeColors[0] ? getSerieTotalItems(activeColors[0]) : 4;
+
       const productPayload: Record<string, any> = {
         name: nameAr.trim(),
         sku: finalSku,
@@ -606,16 +654,17 @@ export default function AddProductModal({
       if (activeWarehouse === 'WHOLESALE') {
         productPayload.wholesale_price = wholesalePrice !== '' ? Number(wholesalePrice) : null;
         productPayload.super_gros_price = superGrosPrice !== '' ? Number(superGrosPrice) : null;
-        productPayload.units_per_serie = Number(unitsPerSerie) || 4;
+        productPayload.units_per_serie = firstColorTotalItemsInSerie;
         productPayload.min_wholesale_series = Number(minWholesaleSeries) || 1;
         productPayload.super_gros_threshold = Number(superGrosThreshold) || 10;
-        productPayload.is_sur_commande = isSurCommande;
       }
 
       const selectedCat = categories.find((cat) => cat.id === categoryId);
       const generatedVariants: ProductVariant[] = [];
 
       activeColors.forEach((c) => {
+        const totalSeriePackItems = getSerieTotalItems(c);
+
         c.activeSizes.forEach((s) => {
           const existingV = existingDbVariants.find(
             (ev) =>
@@ -632,7 +681,8 @@ export default function AddProductModal({
           } else if (activeWarehouse === 'STORE') {
             finalStore = c.storeStocks[s] !== undefined ? c.storeStocks[s] : 5;
           } else if (activeWarehouse === 'WHOLESALE') {
-            finalWs = isSurCommande ? 0 : c.wholesaleStocks[s] !== undefined ? c.wholesaleStocks[s] : 20;
+            const sizePiecesInSerie = c.serieComposition[s] !== undefined ? c.serieComposition[s] : 2;
+            finalWs = sizePiecesInSerie * c.wholesaleSeriesQty;
           }
 
           generatedVariants.push({
@@ -643,7 +693,8 @@ export default function AddProductModal({
             deliveryStock: finalDel,
             storeStock: finalStore,
             wholesaleStock: finalWs,
-            isSurCommande: activeWarehouse === 'WHOLESALE' ? isSurCommande : productToEdit?.isSurCommande,
+            serieComposition: c.serieComposition,
+            wholesaleSeriesQty: c.wholesaleSeriesQty,
           });
         });
       });
@@ -674,7 +725,8 @@ export default function AddProductModal({
           delivery_stock: v.deliveryStock,
           store_stock: v.storeStock,
           wholesale_stock: v.wholesaleStock,
-          is_sur_commande: v.isSurCommande,
+          serie_composition: v.serieComposition,
+          wholesale_series_qty: v.wholesaleSeriesQty,
         }));
 
         const success = await insertVariantsWithResilience(variantRows);
@@ -707,10 +759,9 @@ export default function AddProductModal({
         if (activeWarehouse === 'WHOLESALE') {
           updatedProdObj.wholesalePrice = wholesalePrice !== '' ? Number(wholesalePrice) : null;
           updatedProdObj.superGrosPrice = superGrosPrice !== '' ? Number(superGrosPrice) : null;
-          updatedProdObj.unitsPerSerie = Number(unitsPerSerie) || 4;
+          updatedProdObj.unitsPerSerie = firstColorTotalItemsInSerie;
           updatedProdObj.minWholesaleSeries = Number(minWholesaleSeries) || 1;
           updatedProdObj.superGrosThreshold = Number(superGrosThreshold) || 10;
-          updatedProdObj.isSurCommande = isSurCommande;
         }
 
         if (onProductUpdated) {
@@ -752,7 +803,8 @@ export default function AddProductModal({
             delivery_stock: v.deliveryStock,
             store_stock: v.storeStock,
             wholesale_stock: v.wholesaleStock,
-            is_sur_commande: v.isSurCommande,
+            serie_composition: v.serieComposition,
+            wholesale_series_qty: v.wholesaleSeriesQty,
           }));
 
           const success = await insertVariantsWithResilience(variantRows);
@@ -773,10 +825,9 @@ export default function AddProductModal({
           oldPrice: oldPrice !== '' ? Number(oldPrice) : null,
           wholesalePrice: wholesalePrice !== '' ? Number(wholesalePrice) : null,
           superGrosPrice: superGrosPrice !== '' ? Number(superGrosPrice) : null,
-          unitsPerSerie: Number(unitsPerSerie) || 4,
+          unitsPerSerie: firstColorTotalItemsInSerie,
           minWholesaleSeries: Number(minWholesaleSeries) || 1,
           superGrosThreshold: Number(superGrosThreshold) || 10,
-          isSurCommande: isSurCommande,
           description: description.trim() || undefined,
           imageUrl: activeColors[0]?.imageUrl || undefined,
           colors: activeColors.map((c) => ({ colorName: c.colorName, imageUrl: c.imageUrl })),
@@ -815,7 +866,7 @@ export default function AddProductModal({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm dir-rtl" dir="rtl">
       <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl border border-gray-100 flex flex-col max-h-[90vh] overflow-hidden animate-scale-up">
-        {/* Clean Modal Header (Without any extra banners or badges) */}
+        {/* Clean Modal Header */}
         <div className="p-5 sm:p-6 bg-gradient-to-r from-[#8A2B43] to-[#7A1C32] text-white flex items-center justify-between shrink-0 shadow-md">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center border border-white/20">
@@ -856,7 +907,7 @@ export default function AddProductModal({
                   type="text"
                   value={nameAr}
                   onChange={(e) => setNameAr(e.target.value)}
-                  placeholder="مثال: بيجاما حرير صيفي راقية مطرّزة"
+                  placeholder=""
                   className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-bold focus:outline-none focus:border-[#8A2B43] shadow-sm"
                   required
                 />
@@ -895,7 +946,7 @@ export default function AddProductModal({
                     type="text"
                     value={sku}
                     onChange={(e) => setSku(e.target.value)}
-                    placeholder="مثال: PYJ-882910"
+                    placeholder=""
                     className="flex-1 px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold focus:outline-none focus:border-[#8A2B43] shadow-sm"
                   />
                   <button
@@ -939,7 +990,7 @@ export default function AddProductModal({
                         type="text"
                         value={supplierName}
                         onChange={(e) => setSupplierName(e.target.value)}
-                        placeholder="اكتب اسم المورد الجديد يدوياً..."
+                        placeholder=""
                         className="w-full mt-2 px-4 py-2.5 bg-white rounded-xl border border-gray-200 text-xs font-bold focus:outline-none focus:border-[#8A2B43]"
                       />
                     )}
@@ -956,7 +1007,7 @@ export default function AddProductModal({
                         type="text"
                         value={supplierPhone}
                         onChange={(e) => setSupplierPhone(e.target.value)}
-                        placeholder="يتم ملؤه تلقائياً..."
+                        placeholder=""
                         className="w-full pr-10 pl-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold focus:outline-none focus:border-[#8A2B43] shadow-sm"
                       />
                     </div>
@@ -971,7 +1022,7 @@ export default function AddProductModal({
             <div className="flex items-center justify-between border-b border-gray-200/80 pb-3">
               <h3 className="text-sm font-bold text-[#7A1C32] flex items-center gap-2">
                 <DollarSign className="w-4 h-4 text-[#8A2B43]" />
-                <span>ثانياً: الأسعار (Pricing)</span>
+                <span>ثانياً: الأسعار (Pricing DZD)</span>
               </h3>
 
               {discountPercent !== null && activeWarehouse !== 'WHOLESALE' && (
@@ -1054,7 +1105,7 @@ export default function AddProductModal({
                       type="number"
                       value={superGrosPrice}
                       onChange={(e) => setSuperGrosPrice(e.target.value === '' ? '' : Number(e.target.value))}
-                      placeholder="مثال: 2800"
+                      placeholder="0"
                       className="w-full px-4 py-3 bg-white rounded-xl border border-purple-200 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-purple-800 shadow-sm"
                     />
                   </div>
@@ -1063,44 +1114,16 @@ export default function AddProductModal({
             </div>
           </div>
 
-          {/* SECTION C: WHOLESALE SYSTEM SECTION (SHOWN STRICTLY IN WHOLESALE CONTEXT) */}
+          {/* SECTION C: WHOLESALE THRESHOLDS SECTION (WHOLESALE CONTEXT ONLY) */}
           {activeWarehouse === 'WHOLESALE' && (
             <div className="space-y-5 bg-purple-50/60 p-5 rounded-3xl border border-purple-100">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-purple-200/80 pb-3">
-                <h3 className="text-sm font-bold text-purple-900 flex items-center gap-2">
-                  <Boxes className="w-5 h-5 text-purple-700" />
-                  <span>ثالثاً: إعدادات السريات والطلب المسبق بالجملة (Wholesale Série System)</span>
-                </h3>
+              <h3 className="text-sm font-bold text-purple-900 flex items-center gap-2 border-b border-purple-200/80 pb-3">
+                <Boxes className="w-5 h-5 text-purple-700" />
+                <span>ثالثاً: عتبات طلبيات الجملة والسوبر قرو (Wholesale Thresholds)</span>
+              </h3>
 
-                {/* Sur Commande Checkbox Toggle */}
-                <label className="flex items-center gap-2 cursor-pointer bg-white px-3.5 py-2 rounded-xl border border-purple-200 shadow-xs">
-                  <input
-                    type="checkbox"
-                    checked={isSurCommande}
-                    onChange={(e) => setIsSurCommande(e.target.checked)}
-                    className="w-4 h-4 accent-purple-800 rounded cursor-pointer"
-                  />
-                  <span className="text-xs font-bold text-purple-900">
-                    متوفر على الطلب (Sur Commande / Made to Order)
-                  </span>
-                </label>
-              </div>
-
-              {/* Wholesale Series Inputs */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div>
-                  <label className="block text-xs font-bold text-purple-900 mb-1">
-                    عدد القطع في السلسلة (Pack Size / Série)
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={unitsPerSerie}
-                    onChange={(e) => setUnitsPerSerie(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="w-full px-4 py-3 bg-white rounded-xl border border-purple-200 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-purple-800 shadow-sm"
-                  />
-                </div>
-
+              {/* Wholesale Series Threshold Inputs */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-bold text-purple-900 mb-1">
                     أقل عدد سريات بالجملة (Min Séries)
@@ -1232,7 +1255,7 @@ export default function AddProductModal({
             </div>
           </div>
 
-          {/* SECTION E: Context-Isolated Color Variants & Warehouse Stock Quantities */}
+          {/* SECTION E: Dynamic Color Variants & Wholesale Série Composition */}
           <div className="space-y-6 bg-pyjama-cream/40 p-5 rounded-3xl border border-gray-100">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-gray-200/80 pb-3">
               <h3 className="text-sm font-bold text-[#7A1C32] flex items-center gap-2">
@@ -1252,217 +1275,305 @@ export default function AddProductModal({
 
             {/* List of Colors */}
             <div className="space-y-6">
-              {colors.map((colorItem, index) => (
-                <div
-                  key={colorItem.id}
-                  className="bg-white p-5 rounded-3xl border border-gray-200 shadow-sm space-y-4"
-                >
-                  {/* Top Bar for Color Item */}
-                  <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
-                    <div className="flex items-center gap-3 flex-1">
-                      <span className="w-7 h-7 rounded-full bg-pyjama-cream text-[#8A2B43] font-mono text-xs font-bold flex items-center justify-center shrink-0">
-                        {index + 1}
-                      </span>
+              {colors.map((colorItem, index) => {
+                const totalSerieItems = getSerieTotalItems(colorItem);
 
-                      {/* Color Circle Badge */}
-                      <div
-                        className="w-8 h-8 rounded-full border-2 border-white shadow-md shrink-0 transition-transform hover:scale-110"
-                        style={{ backgroundColor: colorItem.colorHex || '#8A2B43' }}
-                        title={`الدرجة المحددة: ${colorItem.colorHex}`}
-                      />
+                return (
+                  <div
+                    key={colorItem.id}
+                    className="bg-white p-5 rounded-3xl border border-gray-200 shadow-sm space-y-4"
+                  >
+                    {/* Top Bar for Color Item */}
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-gray-100 pb-3">
+                      <div className="flex items-center gap-3 flex-1">
+                        <span className="w-7 h-7 rounded-full bg-pyjama-cream text-[#8A2B43] font-mono text-xs font-bold flex items-center justify-center shrink-0">
+                          {index + 1}
+                        </span>
 
-                      {/* Color Name Input */}
-                      <input
-                        type="text"
-                        value={colorItem.colorName}
-                        onChange={(e) => handleUpdateColor(colorItem.id, 'colorName', e.target.value)}
-                        placeholder="اسم اللون (مثال: عنابي ملكي / أسود / بيج)"
-                        className="flex-1 px-4 py-2.5 bg-pyjama-cream/30 rounded-xl border border-gray-200 text-xs font-bold focus:outline-none focus:border-[#8A2B43]"
-                        required
-                      />
+                        {/* Color Circle Badge */}
+                        <div
+                          className="w-8 h-8 rounded-full border-2 border-white shadow-md shrink-0 transition-transform hover:scale-110"
+                          style={{ backgroundColor: colorItem.colorHex || '#8A2B43' }}
+                          title={`الدرجة المحددة: ${colorItem.colorHex}`}
+                        />
 
-                      {/* Eyedropper & Color Picker */}
-                      <div className="flex items-center gap-1.5 shrink-0">
+                        {/* Color Name Input */}
                         <input
-                          type="color"
-                          value={colorItem.colorHex || '#8A2B43'}
-                          onChange={(e) => handleUpdateColor(colorItem.id, 'colorHex', e.target.value)}
-                          className="w-9 h-9 p-0.5 rounded-xl border border-gray-200 cursor-pointer bg-white"
-                          title="عجلة الألوان"
+                          type="text"
+                          value={colorItem.colorName}
+                          onChange={(e) => handleUpdateColor(colorItem.id, 'colorName', e.target.value)}
+                          placeholder="اسم اللون"
+                          className="flex-1 px-4 py-2.5 bg-pyjama-cream/30 rounded-xl border border-gray-200 text-xs font-bold focus:outline-none focus:border-[#8A2B43]"
+                          required
                         />
 
-                        <button
-                          type="button"
-                          onClick={() => handleOpenEyedropper(colorItem.id)}
-                          className="p-2.5 rounded-xl bg-pyjama-pink-soft text-[#8A2B43] hover:bg-[#8A2B43] hover:text-white transition-all shadow-sm"
-                          title="التقاط درجة اللون مباشرة من الصورة أو الشاشة"
-                        >
-                          <Pipette className="w-4 h-4" />
-                        </button>
-                      </div>
-                    </div>
+                        {/* Eyedropper & Color Picker */}
+                        <div className="flex items-center gap-1.5 shrink-0">
+                          <input
+                            type="color"
+                            value={colorItem.colorHex || '#8A2B43'}
+                            onChange={(e) => handleUpdateColor(colorItem.id, 'colorHex', e.target.value)}
+                            className="w-9 h-9 p-0.5 rounded-xl border border-gray-200 cursor-pointer bg-white"
+                            title="عجلة الألوان"
+                          />
 
-                    {/* Remove Color Button */}
-                    {colors.length > 1 && (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveColor(colorItem.id)}
-                        className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all shrink-0 self-end sm:self-center"
-                        title="حذف هذا اللون"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-
-                  {/* Middle: Direct Image File Upload Dropzone */}
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1.5">
-                      صورة هذا اللون (Direct Image Upload)
-                    </label>
-
-                    {colorItem.imageUrl ? (
-                      <div className="relative w-full h-36 rounded-2xl overflow-hidden border border-gray-200 group bg-gray-50 flex items-center justify-center">
-                        <img
-                          src={colorItem.imageUrl}
-                          alt={colorItem.colorName || 'صورة اللون'}
-                          className="max-h-full max-w-full object-contain"
-                        />
-                        <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
-                          <label className="px-4 py-2 bg-white/90 text-gray-800 rounded-xl text-xs font-bold cursor-pointer hover:bg-white transition-all">
-                            تغيير الصورة
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) handleImageFileChange(colorItem.id, file);
-                              }}
-                            />
-                          </label>
                           <button
                             type="button"
-                            onClick={() => handleUpdateColor(colorItem.id, 'imageUrl', '')}
-                            className="p-2 bg-rose-600 text-white rounded-xl hover:bg-rose-700 transition-all"
-                            title="حذف الصورة"
+                            onClick={() => handleOpenEyedropper(colorItem.id)}
+                            className="p-2.5 rounded-xl bg-pyjama-pink-soft text-[#8A2B43] hover:bg-[#8A2B43] hover:text-white transition-all shadow-sm"
+                            title="التقاط درجة اللون مباشرة من الصورة"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Pipette className="w-4 h-4" />
                           </button>
                         </div>
                       </div>
-                    ) : (
-                      <label className="border-2 border-dashed border-gray-200 hover:border-[#8A2B43] bg-pyjama-cream/20 hover:bg-pyjama-cream/40 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all">
-                        <UploadCloud className="w-8 h-8 text-[#8A2B43] mb-2" />
-                        <span className="text-xs font-bold text-gray-700">انقر هنا أو اسحب الصورة لرفع صورة هذا اللون مباشرة</span>
-                        <span className="text-[10px] text-gray-400 mt-1">يدعم JPG, PNG, WEBP</span>
-                        <input
-                          type="file"
-                          accept="image/*"
-                          className="hidden"
-                          onChange={(e) => {
-                            const file = e.target.files?.[0];
-                            if (file) handleImageFileChange(colorItem.id, file);
-                          }}
-                        />
-                      </label>
-                    )}
-                  </div>
 
-                  {/* Bottom: Context-Isolated Stock Quantities Input */}
-                  <div className="space-y-3 pt-2 border-t border-gray-100">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-gray-700">
-                        كميات المخزون للون ({colorItem.colorName || `لون ${index + 1}`}):
-                      </span>
-
-                      <div className="flex items-center gap-2">
+                      {/* Remove Color Button */}
+                      {colors.length > 1 && (
                         <button
                           type="button"
-                          onClick={() => handleSelectAllSizesForColor(colorItem.id)}
-                          className="text-[11px] font-bold text-[#8A2B43] hover:underline"
+                          onClick={() => handleRemoveColor(colorItem.id)}
+                          className="p-2 text-gray-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all shrink-0 self-end sm:self-center"
+                          title="حذف هذا اللون"
                         >
-                          تحديد الكل
+                          <Trash2 className="w-4 h-4" />
                         </button>
-                        <span className="text-gray-300">•</span>
-                        <button
-                          type="button"
-                          onClick={() => handleDeselectAllSizesForColor(colorItem.id)}
-                          className="text-[11px] font-bold text-gray-500 hover:underline"
-                        >
-                          إلغاء الكل
-                        </button>
-                      </div>
+                      )}
                     </div>
 
-                    {/* Sur Commande Wholesale Notice */}
-                    {activeWarehouse === 'WHOLESALE' && isSurCommande ? (
-                      <div className="p-3.5 bg-purple-50 border border-purple-200 rounded-2xl text-xs font-bold text-purple-900 text-center flex items-center justify-center gap-2">
-                        <Clock className="w-4 h-4 text-purple-700" />
-                        <span>خيار الطلب المسبق (Sur Commande) مفّعل: هذا المنتج متاح للطلب المصنّعي بدون حجز كميات مخزون فيزيائي.</span>
-                      </div>
-                    ) : (
-                      /* Chips & Quantities Grid for Active Warehouse ONLY */
-                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
-                        {generatedSizesList.map((size) => {
-                          const isActive = colorItem.activeSizes.includes(size);
-                          const targetMap =
-                            activeWarehouse === 'DELIVERY'
-                              ? colorItem.deliveryStocks
-                              : activeWarehouse === 'STORE'
-                              ? colorItem.storeStocks
-                              : colorItem.wholesaleStocks;
+                    {/* Middle: Direct Image File Upload Dropzone */}
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1.5">
+                        صورة هذا اللون (Direct Image Upload)
+                      </label>
 
-                          const qtyVal = targetMap[size] ?? (activeWarehouse === 'DELIVERY' ? 10 : activeWarehouse === 'STORE' ? 5 : 20);
-
-                          return (
-                            <div
-                              key={`${colorItem.id}-${size}`}
-                              className={`p-2.5 rounded-2xl border transition-all flex flex-col items-center gap-1.5 ${
-                                isActive
-                                  ? 'bg-pyjama-cream/80 border-[#8A2B43] shadow-sm'
-                                  : 'bg-gray-50 border-gray-200 opacity-60'
-                              }`}
+                      {colorItem.imageUrl ? (
+                        <div className="relative w-full h-36 rounded-2xl overflow-hidden border border-gray-200 group bg-gray-50 flex items-center justify-center">
+                          <img
+                            src={colorItem.imageUrl}
+                            alt={colorItem.colorName || 'صورة اللون'}
+                            className="max-h-full max-w-full object-contain"
+                          />
+                          <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-3">
+                            <label className="px-4 py-2 bg-white/90 text-gray-800 rounded-xl text-xs font-bold cursor-pointer hover:bg-white transition-all">
+                              تغيير الصورة
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) handleImageFileChange(colorItem.id, file);
+                                }}
+                              />
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => handleUpdateColor(colorItem.id, 'imageUrl', '')}
+                              className="p-2 bg-rose-600 text-white rounded-xl hover:bg-rose-700 transition-all"
+                              title="حذف الصورة"
                             >
-                              <button
-                                type="button"
-                                onClick={() => handleToggleColorSize(colorItem.id, size)}
-                                className={`w-full py-1 rounded-xl text-xs font-mono font-black flex items-center justify-center gap-1 transition-all ${
+                              <Trash2 className="w-4 h-4" />
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <label className="border-2 border-dashed border-gray-200 hover:border-[#8A2B43] bg-pyjama-cream/20 hover:bg-pyjama-cream/40 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all">
+                          <UploadCloud className="w-8 h-8 text-[#8A2B43] mb-2" />
+                          <span className="text-xs font-bold text-gray-700">انقر هنا أو اسحب الصورة لرفع صورة هذا اللون مباشرة</span>
+                          <span className="text-[10px] text-gray-400 mt-1">يدعم JPG, PNG, WEBP</span>
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) handleImageFileChange(colorItem.id, file);
+                            }}
+                          />
+                        </label>
+                      )}
+                    </div>
+
+                    {/* Bottom: RETAIL vs DYNAMIC WHOLESALE SÉRIÉ COMPOSITION */}
+                    {activeWarehouse === 'WHOLESALE' ? (
+                      /* DYNAMIC WHOLESALE SÉRIÉ COMPOSITION PER COLOR */
+                      <div className="space-y-4 pt-3 border-t border-purple-100 bg-purple-50/40 p-4 rounded-2xl">
+                        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
+                          <span className="text-xs font-bold text-purple-900 flex items-center gap-1.5">
+                            <Layers className="w-4 h-4 text-purple-700" />
+                            <span>تركيبة السلسلة الواحدة (Série Pack Composition) للون ({colorItem.colorName || `لون ${index + 1}`}):</span>
+                          </span>
+
+                          {/* Auto-Calculated Total Pieces Badge */}
+                          <span className="px-3 py-1 bg-purple-900 text-white rounded-xl text-xs font-mono font-bold shadow-xs">
+                            إجمالي قطع السلسلة = {totalSerieItems} قطعة
+                          </span>
+                        </div>
+
+                        {/* Breakdown per size inside 1 Série */}
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2.5">
+                          {generatedSizesList.map((size) => {
+                            const isActive = colorItem.activeSizes.includes(size);
+                            const currentSizeCountInSerie =
+                              colorItem.serieComposition[size] !== undefined
+                                ? colorItem.serieComposition[size]
+                                : 2;
+
+                            return (
+                              <div
+                                key={`serie-comp-${colorItem.id}-${size}`}
+                                className={`p-2.5 rounded-2xl border transition-all flex flex-col items-center gap-1.5 ${
                                   isActive
-                                    ? 'bg-[#8A2B43] text-white shadow-xs'
-                                    : 'bg-white text-[#7A1C32] border border-gray-200'
+                                    ? 'bg-white border-purple-300 shadow-xs'
+                                    : 'bg-gray-50 border-gray-200 opacity-50'
                                 }`}
                               >
-                                <span>{size}</span>
-                                {isActive && <Check className="w-3 h-3" />}
-                              </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleColorSize(colorItem.id, size)}
+                                  className={`w-full py-1 rounded-xl text-xs font-mono font-black flex items-center justify-center gap-1 transition-all ${
+                                    isActive
+                                      ? 'bg-purple-900 text-white'
+                                      : 'bg-white text-gray-700 border border-gray-200'
+                                  }`}
+                                >
+                                  <span>{size}</span>
+                                  {isActive && <Check className="w-3 h-3" />}
+                                </button>
 
-                              {isActive && (
-                                <div className="w-full flex items-center justify-center gap-1 mt-0.5">
-                                  <span className="text-[10px] font-bold text-gray-500">الكمية:</span>
-                                  <input
-                                    type="number"
-                                    min="0"
-                                    value={qtyVal}
-                                    onChange={(e) =>
-                                      handleUpdateStockQuantity(
-                                        colorItem.id,
-                                        size,
-                                        parseInt(e.target.value) || 0
-                                      )
-                                    }
-                                    className="w-12 text-center py-1 bg-white rounded-lg border border-gray-300 text-xs font-mono font-bold focus:outline-none focus:border-[#8A2B43]"
-                                  />
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
+                                {isActive && (
+                                  <div className="w-full flex flex-col items-center gap-1 mt-0.5">
+                                    <span className="text-[10px] font-bold text-purple-900">قطع/سلسلة:</span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      value={currentSizeCountInSerie}
+                                      onChange={(e) =>
+                                        handleUpdateSerieSizeComposition(
+                                          colorItem.id,
+                                          size,
+                                          parseInt(e.target.value) || 0
+                                        )
+                                      }
+                                      className="w-12 text-center py-1 bg-purple-50 rounded-lg border border-purple-200 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-purple-800"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+
+                        {/* Available Séries Stock Input */}
+                        <div className="pt-2 border-t border-purple-200/60 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+                          <label className="text-xs font-bold text-purple-900">
+                            عدد السلاسل المتوفرة في المخزون (Available Séries Qty):
+                          </label>
+                          <div className="flex items-center gap-2 w-full sm:w-auto">
+                            <input
+                              type="number"
+                              min="0"
+                              value={colorItem.wholesaleSeriesQty}
+                              onChange={(e) =>
+                                handleUpdateColor(
+                                  colorItem.id,
+                                  'wholesaleSeriesQty',
+                                  Math.max(0, parseInt(e.target.value) || 0)
+                                )
+                              }
+                              className="w-24 px-3 py-1.5 bg-white rounded-xl border border-purple-300 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-purple-800 text-center"
+                            />
+                            <span className="text-xs font-bold text-purple-800">سلسلة (Séries)</span>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      /* RETAIL (DELIVERY / STORE) STOCK QUANTITIES PER SIZE */
+                      <div className="space-y-3 pt-2 border-t border-gray-100">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-gray-700">
+                            كميات المخزون للون ({colorItem.colorName || `لون ${index + 1}`}):
+                          </span>
+
+                          <div className="flex items-center gap-2">
+                            <button
+                              type="button"
+                              onClick={() => handleSelectAllSizesForColor(colorItem.id)}
+                              className="text-[11px] font-bold text-[#8A2B43] hover:underline"
+                            >
+                              تحديد الكل
+                            </button>
+                            <span className="text-gray-300">•</span>
+                            <button
+                              type="button"
+                              onClick={() => handleDeselectAllSizesForColor(colorItem.id)}
+                              className="text-[11px] font-bold text-gray-500 hover:underline"
+                            >
+                              إلغاء الكل
+                            </button>
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+                          {generatedSizesList.map((size) => {
+                            const isActive = colorItem.activeSizes.includes(size);
+                            const targetMap =
+                              activeWarehouse === 'DELIVERY'
+                                ? colorItem.deliveryStocks
+                                : colorItem.storeStocks;
+
+                            const qtyVal = targetMap[size] ?? (activeWarehouse === 'DELIVERY' ? 10 : 5);
+
+                            return (
+                              <div
+                                key={`${colorItem.id}-${size}`}
+                                className={`p-2.5 rounded-2xl border transition-all flex flex-col items-center gap-1.5 ${
+                                  isActive
+                                    ? 'bg-pyjama-cream/80 border-[#8A2B43] shadow-sm'
+                                    : 'bg-gray-50 border-gray-200 opacity-60'
+                                }`}
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => handleToggleColorSize(colorItem.id, size)}
+                                  className={`w-full py-1 rounded-xl text-xs font-mono font-black flex items-center justify-center gap-1 transition-all ${
+                                    isActive
+                                      ? 'bg-[#8A2B43] text-white shadow-xs'
+                                      : 'bg-white text-[#7A1C32] border border-gray-200'
+                                  }`}
+                                >
+                                  <span>{size}</span>
+                                  {isActive && <Check className="w-3 h-3" />}
+                                </button>
+
+                                {isActive && (
+                                  <div className="w-full flex items-center justify-center gap-1 mt-0.5">
+                                    <span className="text-[10px] font-bold text-gray-500">الكمية:</span>
+                                    <input
+                                      type="number"
+                                      min="0"
+                                      value={qtyVal}
+                                      onChange={(e) =>
+                                        handleUpdateStockQuantity(
+                                          colorItem.id,
+                                          size,
+                                          parseInt(e.target.value) || 0
+                                        )
+                                      }
+                                      className="w-12 text-center py-1 bg-white rounded-lg border border-gray-300 text-xs font-mono font-bold focus:outline-none focus:border-[#8A2B43]"
+                                    />
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
                   </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           </div>
 
@@ -1477,8 +1588,8 @@ export default function AddProductModal({
               rows={3}
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="وصف اختياري للمنتج (مثال: بيجاما صيفية مصنوعة من الحرير الطبيعي 100%، ملمس ناعم ومريح للنوم، غسيل يدوي بماء بارد)..."
-              className="w-full p-4 bg-[#ffffff] rounded-2xl border border-gray-200 text-xs font-sans focus:outline-none focus:border-[#8A2B43] shadow-sm"
+              placeholder=""
+              className="w-full p-4 bg-white rounded-2xl border border-gray-200 text-xs font-sans focus:outline-none focus:border-[#8A2B43] shadow-sm"
             />
           </div>
 
