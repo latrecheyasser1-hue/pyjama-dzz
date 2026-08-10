@@ -338,17 +338,50 @@ export default function AddProductModal({
         }
       }
 
-      if (productToEdit.colors && productToEdit.colors.length > 0) {
-        const colorItems: ColorInputItem[] = productToEdit.colors.map((c, idx) => {
-          const colorName = c.colorName;
-          const colorVariants = productToEdit.variants?.filter((v) => v.color === colorName) || [];
-          const activeSizes = colorVariants.map((v) => v.size);
+      // Query product_variants directly from DB on edit to guarantee color_image_url hydration
+      const hydrateColorVariantsFromDb = async () => {
+        const { data: dbVars } = await supabase
+          .from('product_variants')
+          .select('*')
+          .eq('product_id', productToEdit.id);
+
+        const variantsToMap = (dbVars && dbVars.length > 0)
+          ? dbVars.map((v: any) => ({
+              size: v.size || v.size_name || 'Standard',
+              color: v.color_name || v.color || 'أساسي',
+              color_image_url: v.color_image_url || v.colorImageUrl || undefined,
+              deliveryStock: Number(v.delivery_stock) || 0,
+              storeStock: Number(v.store_stock) || 0,
+              wholesaleStock: Number(v.wholesale_stock) || 0,
+              serieComposition: v.serie_composition || undefined,
+            }))
+          : (productToEdit.variants || []);
+
+        const colorGroups: Record<string, any[]> = {};
+        variantsToMap.forEach((v: any) => {
+          const colName = v.color || 'اللون الأساسي';
+          if (!colorGroups[colName]) colorGroups[colName] = [];
+          colorGroups[colName].push(v);
+        });
+
+        // Check productToEdit.colors for any additional color items
+        if (productToEdit.colors) {
+          productToEdit.colors.forEach((c) => {
+            if (!colorGroups[c.colorName]) {
+              colorGroups[c.colorName] = [];
+            }
+          });
+        }
+
+        const colorItems: ColorInputItem[] = Object.entries(colorGroups).map(([colName, vars], idx) => {
+          const activeSizes: string[] = [];
           const delStocks: Record<string, number> = {};
           const storeStocks: Record<string, number> = {};
           const wsStocks: Record<string, number> = {};
           const serieComp: Record<string, number> = {};
 
-          colorVariants.forEach((v) => {
+          vars.forEach((v) => {
+            if (v.size) activeSizes.push(v.size);
             delStocks[v.size] = v.deliveryStock;
             storeStocks[v.size] = v.storeStock;
             wsStocks[v.size] = v.wholesaleStock;
@@ -359,24 +392,21 @@ export default function AddProductModal({
             }
           });
 
-          // Check if any variant in this color has its own specific color_image_url
-          const specificVariantImg = colorVariants.find(
-            (v: any) => v.color_image_url || v.colorImageUrl
-          );
+          // Extract color_image_url from variant rows or color object in prop
+          const varWithImg = vars.find((v) => v.color_image_url || v.colorImageUrl);
+          const colorPropObj = productToEdit.colors?.find((c) => c.colorName === colName);
 
-          const foundVarImg = specificVariantImg?.color_image_url || specificVariantImg?.colorImageUrl;
-          const candidateImg = foundVarImg || c.imageUrl;
-
-          // PRESERVE NULL/EMPTY IF CANDIDATE MATCHES MAIN PRODUCT IMAGE TO PREVENT DUPLICATION!
-          const mainProdImg = productToEdit.imageUrl || (productToEdit as any).image_url;
-          const isMainImageDuplicate = !foundVarImg && candidateImg && mainProdImg && candidateImg === mainProdImg;
-          const specificColorImg = isMainImageDuplicate ? '' : (candidateImg || '');
+          const savedImage =
+            varWithImg?.color_image_url ||
+            varWithImg?.colorImageUrl ||
+            colorPropObj?.imageUrl ||
+            '';
 
           return {
             id: `c-edit-${idx}-${Date.now()}`,
-            colorName: colorName,
+            colorName: colName,
             colorHex: '#ffffff',
-            imageUrl: specificColorImg, // Strictly specific color image only!
+            imageUrl: savedImage, // 100% PERSISTENT SAVED IMAGE FROM DB!
             deliveryStocks: delStocks,
             storeStocks: storeStocks,
             wholesaleStocks: wsStocks,
@@ -384,55 +414,13 @@ export default function AddProductModal({
             activeSizes: activeSizes.length > 0 ? activeSizes : ['S', 'M', 'L', 'XL'],
           };
         });
-        setColors(colorItems);
-      } else if (productToEdit.variants && productToEdit.variants.length > 0) {
-        const colorGroups: Record<string, ProductVariant[]> = {};
-        productToEdit.variants.forEach((v) => {
-          const col = v.color || 'اللون الأساسي';
-          if (!colorGroups[col]) colorGroups[col] = [];
-          colorGroups[col].push(v);
-        });
 
-        const colorItems: ColorInputItem[] = Object.entries(colorGroups).map(([colName, vars], idx) => {
-          const delStocks: Record<string, number> = {};
-          const storeStocks: Record<string, number> = {};
-          const wsStocks: Record<string, number> = {};
-          const serieComp: Record<string, number> = {};
-          const activeSizes: string[] = [];
+        if (colorItems.length > 0) {
+          setColors(colorItems);
+        }
+      };
 
-          vars.forEach((v) => {
-            activeSizes.push(v.size);
-            delStocks[v.size] = v.deliveryStock;
-            storeStocks[v.size] = v.storeStock;
-            wsStocks[v.size] = v.wholesaleStock;
-            if (v.serieComposition && typeof v.serieComposition === 'object') {
-              Object.assign(serieComp, v.serieComposition);
-            } else {
-              serieComp[v.size] = 2;
-            }
-          });
-
-          const specificVariantImg = vars.find(
-            (v: any) => v.color_image_url || v.colorImageUrl
-          );
-          const specificImg =
-            specificVariantImg?.color_image_url ||
-            specificVariantImg?.colorImageUrl;
-
-          return {
-            id: `c-edit-v-${idx}-${Date.now()}`,
-            colorName: colName,
-            colorHex: '#ffffff',
-            imageUrl: specificImg || '', // Strictly specific color image only!
-            deliveryStocks: delStocks,
-            storeStocks: storeStocks,
-            wholesaleStocks: wsStocks,
-            serieComposition: Object.keys(serieComp).length > 0 ? serieComp : { S: 2, M: 2, L: 2, XL: 2 },
-            activeSizes,
-          };
-        });
-        setColors(colorItems);
-      }
+      hydrateColorVariantsFromDb();
     } else {
       resetForm();
     }
