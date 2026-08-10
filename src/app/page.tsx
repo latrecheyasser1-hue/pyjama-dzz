@@ -1,0 +1,423 @@
+'use client';
+
+import React, { useState, useEffect } from 'react';
+import { Menu, Lock, Sparkles, RefreshCw } from 'lucide-react';
+import PinLockScreen from '@/components/admin/PinLockScreen';
+import PinChangeModal from '@/components/admin/PinChangeModal';
+import AdminSidebar from '@/components/admin/AdminSidebar';
+
+// Sections
+import NewOrdersTicker from '@/components/admin/sections/NewOrdersTicker';
+import InventoryManager from '@/components/admin/sections/InventoryManager';
+import CategoriesManager from '@/components/admin/sections/CategoriesManager';
+import SuppliersManager from '@/components/admin/sections/SuppliersManager';
+import CustomerScoringManager from '@/components/admin/sections/CustomerScoringManager';
+import ComplaintsManager from '@/components/admin/sections/ComplaintsManager';
+import AnalyticsFinancials from '@/components/admin/sections/AnalyticsFinancials';
+import OrderHistoryArchive from '@/components/admin/sections/OrderHistoryArchive';
+import SettingsHub from '@/components/admin/sections/SettingsHub';
+
+// Types
+import {
+  AdminSettings,
+  Category,
+  Supplier,
+  Customer,
+  Product,
+  Order,
+  Expense,
+  Complaint,
+  DashboardSection,
+  StockType,
+  OrderStatus,
+  ComplaintStatus,
+} from '@/types/admin';
+
+// Initial Mock Seed Data
+const initialSettings: AdminSettings = {
+  id: 1,
+  adminPinHash: '765483', // Default PIN: 765483
+  cashierPin: '123456',
+  packagingPin: '654321',
+  instagramUrl: 'https://www.instagram.com/pyjama_dz',
+  tiktokUrl: 'https://www.tiktok.com/@pyjama_dz',
+  facebookUrl: 'https://www.facebook.com/pyjamadz',
+  mapsUrl: 'https://maps.google.com/?q=Chlef,Algeria',
+  whatsappNumber: '+213555000000',
+  callPhoneNumbers: ['+213 555 11 22 33', '+213 666 44 55 66'],
+  storeManagerPhone: '+213 555 11 22 33',
+  deliveryManagerPhone: '+213 555 22 33 44',
+  packagingStaffPhone: '+213 555 33 44 55',
+  addressWilaya: 'الشلف',
+  addressCommune: 'الشلف',
+};
+
+const initialCategories: Category[] = [
+  { id: '1', nameAr: 'بيجامات حريرية', nameFr: 'Pyjamas Hiver', slug: 'pyjamas-hiver' },
+  { id: '2', nameAr: 'ملابس النوم', nameFr: 'Nuisettes & Lingerie', slug: 'nuisettes-lingerie' },
+  { id: '3', nameAr: 'أحذية داخلية', nameFr: 'Chaussons & Pantoufles', slug: 'chaussons' },
+  { id: '4', nameAr: 'روب دو شامبر', nameFr: 'Peignoirs & Robes', slug: 'peignoirs' },
+];
+
+const initialSuppliers: Supplier[] = [
+  { id: '1', name: 'مؤسسة الأناقة للمنسوجات', phone: '+213 550 12 34 56', totalOrders: 15, outstandingBalance: 120000 },
+  { id: '2', name: 'ورشة البهجة للبيجاما', phone: '+213 661 98 76 54', totalOrders: 8, outstandingBalance: 45000 },
+];
+
+const initialCustomers: Customer[] = [
+  {
+    id: '1',
+    fullName: 'أمينا بن علي',
+    phone: '+213 551 23 45 67',
+    wilaya: 'الشلف',
+    commune: 'الشلف',
+    confirmedOrders: 7,
+    cancelledOrders: 1,
+    totalSpent: 38500,
+    tag: 'BON_CLIENT',
+  },
+  {
+    id: '2',
+    fullName: 'سارة بودواو',
+    phone: '+213 662 34 56 78',
+    wilaya: 'الجزائر',
+    commune: 'باب الزوار',
+    confirmedOrders: 1,
+    cancelledOrders: 4,
+    totalSpent: 4500,
+    tag: 'MAUVAIS_CLIENT',
+  },
+  {
+    id: '3',
+    fullName: 'فاطمة قاسم',
+    phone: '+213 773 45 67 89',
+    wilaya: 'وهران',
+    commune: 'السانية',
+    confirmedOrders: 3,
+    cancelledOrders: 1,
+    totalSpent: 14200,
+    tag: 'NORMAL',
+  },
+];
+
+const initialProducts: Product[] = [
+  {
+    id: '1',
+    sku: 'PYJ-SILK-01',
+    nameAr: 'بيجاما حرير صيفي راقية',
+    categoryId: '1',
+    categoryNameAr: 'بيجامات حريرية',
+    costPrice: 2800,
+    sellingPrice: 5500,
+    variants: [
+      { id: 'v1', productId: '1', size: 'M', color: 'زهري (Burgundy)', deliveryStock: 12, storeStock: 8, wholesaleStock: 25 },
+      { id: 'v2', productId: '1', size: 'L', color: 'زهري (Burgundy)', deliveryStock: 2, storeStock: 5, wholesaleStock: 10 },
+    ],
+  },
+  {
+    id: '2',
+    sku: 'ROB-VELVET-02',
+    nameAr: 'روب مخملي شتوي مطرّز',
+    categoryId: '4',
+    categoryNameAr: 'روب دو شامبر',
+    costPrice: 4200,
+    sellingPrice: 8900,
+    variants: [
+      { id: 'v3', productId: '2', size: 'XL', color: 'وردي ناعم (Dusty Pink)', deliveryStock: 15, storeStock: 10, wholesaleStock: 30 },
+    ],
+  },
+];
+
+const initialOrders: Order[] = [
+  {
+    id: 'o1',
+    sequentialId: 1,
+    formattedId: '01',
+    customerName: 'أمينا بن علي',
+    customerPhone: '+213 551 23 45 67',
+    wilaya: 'الشلف',
+    commune: 'الشلف',
+    deliveryType: 'HOME',
+    totalAmountDzd: 5500,
+    status: 'UNCONFIRMED',
+    createdAt: '2026-08-10 10:15',
+  },
+  {
+    id: 'o2',
+    sequentialId: 2,
+    formattedId: '02',
+    customerName: 'سارة بودواو',
+    customerPhone: '+213 662 34 56 78',
+    wilaya: 'الجزائر',
+    commune: 'باب الزوار',
+    deliveryType: 'STOP_DESK',
+    totalAmountDzd: 4200,
+    status: 'CONFIRMED',
+    createdAt: '2026-08-09 16:30',
+  },
+  {
+    id: 'o3',
+    sequentialId: 3,
+    formattedId: '03',
+    customerName: 'فاطمة قاسم',
+    customerPhone: '+213 773 45 67 89',
+    wilaya: 'وهران',
+    commune: 'السانية',
+    deliveryType: 'HOME',
+    totalAmountDzd: 8900,
+    status: 'DELIVERED',
+    createdAt: '2026-08-08 14:10',
+  },
+];
+
+const initialExpenses: Expense[] = [
+  { id: 'e1', title: 'شراء قماش حرير شتاء', amountDzd: 150000, category: 'COGS', expenseDate: '2026-08-01' },
+  { id: 'e2', title: 'مصاريف الشحن والمرتجعات', amountDzd: 12500, category: 'SHIPPING_RETURN', expenseDate: '2026-08-05' },
+  { id: 'e3', title: 'كهرباء وتدفئة المحل', amountDzd: 8500, category: 'OPERATING', expenseDate: '2026-08-07' },
+];
+
+const initialComplaints: Complaint[] = [
+  {
+    id: 'c1',
+    customerName: 'سارة بودواو',
+    customerPhone: '+213 662 34 56 78',
+    subject: 'تأخر التوصيل',
+    message: 'الطلب تأخر يومين عن الموعد المحدد في محطة Stop Desk',
+    status: 'PENDING',
+    createdAt: '2026-08-10 09:20',
+  },
+];
+
+export default function MasterAdminPage() {
+  // State
+  const [isLocked, setIsLocked] = useState<boolean>(true);
+  const [isPinModalOpen, setIsPinModalOpen] = useState<boolean>(false);
+  const [activeSection, setActiveSection] = useState<DashboardSection>('NEW_ORDERS');
+  const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState<boolean>(false);
+
+  // Entities State
+  const [settings, setSettings] = useState<AdminSettings>(initialSettings);
+  const [categories, setCategories] = useState<Category[]>(initialCategories);
+  const [suppliers, setSuppliers] = useState<Supplier[]>(initialSuppliers);
+  const [customers, setCustomers] = useState<Customer[]>(initialCustomers);
+  const [products, setProducts] = useState<Product[]>(initialProducts);
+  const [orders, setOrders] = useState<Order[]>(initialOrders);
+  const [expenses, setExpenses] = useState<Expense[]>(initialExpenses);
+  const [complaints, setComplaints] = useState<Complaint[]>(initialComplaints);
+
+  // Unconfirmed Orders Count
+  const unconfirmedOrders = orders.filter((o) => o.status === 'UNCONFIRMED');
+
+  // Action Handlers
+  const handleConfirmOrder = (id: string) => {
+    setOrders((prev) =>
+      prev.map((o) => (o.id === id ? { ...o, status: 'CONFIRMED' as OrderStatus } : o))
+    );
+  };
+
+  const handleCancelOrder = (id: string) => {
+    setOrders((prev) =>
+      prev.map((o) => (o.id === id ? { ...o, status: 'CANCELLED' as OrderStatus } : o))
+    );
+  };
+
+  const handleUpdateStock = (variantId: string, stockType: StockType, newQuantity: number) => {
+    setProducts((prev) =>
+      prev.map((p) => ({
+        ...p,
+        variants: p.variants.map((v) => {
+          if (v.id === variantId) {
+            if (stockType === 'DELIVERY') return { ...v, deliveryStock: newQuantity };
+            if (stockType === 'STORE') return { ...v, storeStock: newQuantity };
+            if (stockType === 'WHOLESALE') return { ...v, wholesaleStock: newQuantity };
+          }
+          return v;
+        }),
+      }))
+    );
+  };
+
+  const handleAddCategory = (nameAr: string, nameFr: string) => {
+    const newCat: Category = {
+      id: String(Date.now()),
+      nameAr,
+      nameFr,
+      slug: nameFr.toLowerCase().replace(/\s+/g, '-'),
+    };
+    setCategories((prev) => [...prev, newCat]);
+  };
+
+  const handleDeleteCategory = (id: string) => {
+    setCategories((prev) => prev.filter((c) => c.id !== id));
+  };
+
+  const handleAddSupplier = (supplier: Omit<Supplier, 'id'>) => {
+    const newSup: Supplier = {
+      ...supplier,
+      id: String(Date.now()),
+    };
+    setSuppliers((prev) => [...prev, newSup]);
+  };
+
+  const handleUpdateComplaintStatus = (id: string, newStatus: ComplaintStatus) => {
+    setComplaints((prev) =>
+      prev.map((c) => (c.id === id ? { ...c, status: newStatus } : c))
+    );
+  };
+
+  const handleUpdateOrderStatus = (id: string, newStatus: OrderStatus) => {
+    setOrders((prev) =>
+      prev.map((o) => (o.id === id ? { ...o, status: newStatus } : o))
+    );
+  };
+
+  const handleUpdatePin = (newPin: string) => {
+    setSettings((prev) => ({ ...prev, adminPinHash: newPin }));
+  };
+
+  const handleSaveSettings = (updated: AdminSettings) => {
+    setSettings(updated);
+  };
+
+  if (isLocked) {
+    return (
+      <PinLockScreen
+        storedPin={settings.adminPinHash}
+        onUnlock={() => setIsLocked(false)}
+      />
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-pyjama-cream flex flex-col lg:flex-row text-pyjama-charcoal font-sans dir-rtl" dir="rtl">
+      {/* Admin Sidebar */}
+      <AdminSidebar
+        activeSection={activeSection}
+        onSelectSection={setActiveSection}
+        unconfirmedCount={unconfirmedOrders.length}
+        onOpenPinChangeModal={() => setIsPinModalOpen(true)}
+        onLock={() => setIsLocked(true)}
+        isMobileOpen={isMobileSidebarOpen}
+        onCloseMobile={() => setIsMobileSidebarOpen(false)}
+      />
+
+      {/* Main Content Area */}
+      <main className="flex-1 lg:mr-72 p-4 sm:p-6 lg:p-8 space-y-6">
+        {/* Top Header Bar */}
+        <header className="bg-white rounded-3xl p-4 sm:p-5 border border-gray-100 shadow-card flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsMobileSidebarOpen(true)}
+              className="lg:hidden p-2 rounded-xl bg-pyjama-cream text-[#8A2B43] hover:bg-[#8A2B43] hover:text-white transition-all"
+            >
+              <Menu className="w-5 h-5" />
+            </button>
+
+            <div>
+              <h1 className="text-lg sm:text-xl font-black text-pyjama-charcoal">
+                {activeSection === 'NEW_ORDERS' && 'الطلبيات الجديدة الواردة (Alerts)'}
+                {activeSection === 'INVENTORY' && 'المخزون والمستودعات الثلاثة (Inventory)'}
+                {activeSection === 'CATEGORIES' && 'الأقسام والتصنيفات (Categories)'}
+                {activeSection === 'SUPPLIERS' && 'إدارة الموردين والورشات (Suppliers)'}
+                {activeSection === 'CUSTOMERS' && 'تصنيف الزبائن الجزائريين (Customer Scoring)'}
+                {activeSection === 'COMPLAINTS' && 'الشكاوى والاقتراحات (Complaints)'}
+                {activeSection === 'ANALYTICS' && 'التحليلات المالية والربح (Analytics)'}
+                {activeSection === 'ORDER_HISTORY' && 'الأرشيف والسجل العام (Order History)'}
+                {activeSection === 'SETTINGS' && 'الإعدادات الشاملة للمتجر (Settings)'}
+              </h1>
+              <p className="text-xs text-gray-500 font-medium hidden sm:block">
+                لوحة التحكم الإدارية ERP • بيجاما ديزاين الشلف ({settings.addressWilaya})
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <button
+              onClick={() => setIsLocked(true)}
+              className="p-2.5 rounded-xl bg-rose-50 text-rose-700 hover:bg-rose-100 border border-rose-200 transition-all text-xs font-bold flex items-center gap-1.5"
+              title="قفل الشاشة"
+            >
+              <Lock className="w-4 h-4" />
+              <span className="hidden sm:inline">قفل (Lock)</span>
+            </button>
+          </div>
+        </header>
+
+        {/* Section View Router */}
+        {activeSection === 'NEW_ORDERS' && (
+          <NewOrdersTicker
+            unconfirmedOrders={unconfirmedOrders}
+            onConfirmOrder={handleConfirmOrder}
+            onCancelOrder={handleCancelOrder}
+          />
+        )}
+
+        {activeSection === 'INVENTORY' && (
+          <InventoryManager
+            products={products}
+            onUpdateStock={handleUpdateStock}
+            onAddProduct={() => setActiveSection('SETTINGS')}
+          />
+        )}
+
+        {activeSection === 'CATEGORIES' && (
+          <CategoriesManager
+            categories={categories}
+            onAddCategory={handleAddCategory}
+            onDeleteCategory={handleDeleteCategory}
+          />
+        )}
+
+        {activeSection === 'SUPPLIERS' && (
+          <SuppliersManager
+            suppliers={suppliers}
+            onAddSupplier={handleAddSupplier}
+          />
+        )}
+
+        {activeSection === 'CUSTOMERS' && (
+          <CustomerScoringManager customers={customers} />
+        )}
+
+        {activeSection === 'COMPLAINTS' && (
+          <ComplaintsManager
+            complaints={complaints}
+            onUpdateStatus={handleUpdateComplaintStatus}
+          />
+        )}
+
+        {activeSection === 'ANALYTICS' && (
+          <AnalyticsFinancials
+            orders={orders}
+            products={products}
+            expenses={expenses}
+          />
+        )}
+
+        {activeSection === 'ORDER_HISTORY' && (
+          <OrderHistoryArchive
+            orders={orders}
+            complaints={complaints}
+            onUpdateOrderStatus={handleUpdateOrderStatus}
+          />
+        )}
+
+        {activeSection === 'SETTINGS' && (
+          <SettingsHub
+            settings={settings}
+            onSaveSettings={handleSaveSettings}
+            onOpenPinChangeModal={() => setIsPinModalOpen(true)}
+          />
+        )}
+      </main>
+
+      {/* PIN Password Change Modal */}
+      <PinChangeModal
+        isOpen={isPinModalOpen}
+        onClose={() => setIsPinModalOpen(false)}
+        currentPin={settings.adminPinHash}
+        onUpdatePin={handleUpdatePin}
+      />
+    </div>
+  );
+}
