@@ -20,18 +20,20 @@ import {
   Pipette,
   UploadCloud,
   Check,
-  Layers,
   ShoppingBag,
   Store,
   Boxes,
   HelpCircle,
+  Clock,
+  ShieldCheck,
 } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
-import { Category, Product, ProductVariant, Supplier } from '@/types/admin';
+import { Category, Product, ProductVariant, Supplier, StockType } from '@/types/admin';
 
 interface AddProductModalProps {
   isOpen: boolean;
   onClose: () => void;
+  activeWarehouse?: StockType; // Strictly enforces context isolation: 'DELIVERY' | 'STORE' | 'WHOLESALE'
   onProductAdded: (newProduct: Product) => void;
   onProductUpdated?: (updatedProduct: Product) => void;
   reFetchProducts?: () => Promise<void>;
@@ -70,7 +72,7 @@ interface ColorInputItem {
   colorName: string;
   colorHex: string;
   imageUrl: string;
-  // Multi-warehouse independent stocks per size
+  // Warehouse Stock Quantity Maps
   deliveryStocks: Record<string, number>;
   storeStocks: Record<string, number>;
   wholesaleStocks: Record<string, number>;
@@ -80,14 +82,12 @@ interface ColorInputItem {
 export default function AddProductModal({
   isOpen,
   onClose,
+  activeWarehouse = 'DELIVERY',
   onProductAdded,
   onProductUpdated,
   reFetchProducts,
   productToEdit,
 }: AddProductModalProps) {
-  // Sales Mode Toggle (Toggles visibility of Supplier Info)
-  const [salesTargetMode, setSalesTargetMode] = useState<'RETAIL' | 'WHOLESALE' | 'BOTH'>('BOTH');
-
   // Basic Info Form State
   const [nameAr, setNameAr] = useState('');
   const [categoryId, setCategoryId] = useState('');
@@ -96,12 +96,12 @@ export default function AddProductModal({
   const [supplierPhone, setSupplierPhone] = useState('');
   const [sku, setSku] = useState('');
 
-  // Detailed Pricing State (DZD)
+  // Pricing State (DZD)
   const [costPrice, setCostPrice] = useState<number | ''>('');
-  const [sellingPrice, setSellingPrice] = useState<number | ''>('');
+  const [sellingPrice, setSellingPrice] = useState<number | ''>(''); // Retail / Delivery / Store
   const [oldPrice, setOldPrice] = useState<number | ''>('');
-  const [wholesalePrice, setWholesalePrice] = useState<number | ''>('');
-  const [superGrosPrice, setSuperGrosPrice] = useState<number | ''>('');
+  const [wholesalePrice, setWholesalePrice] = useState<number | ''>(''); // Wholesale
+  const [superGrosPrice, setSuperGrosPrice] = useState<number | ''>(''); // Super Gros Wholesale
 
   // Advanced Wholesale System State
   const [unitsPerSerie, setUnitsPerSerie] = useState<number>(4);
@@ -114,9 +114,6 @@ export default function AddProductModal({
   const [isStandardSize, setIsStandardSize] = useState(false);
   const [minSize, setMinSize] = useState('S');
   const [maxSize, setMaxSize] = useState('XL');
-
-  // Active Stock Warehouse Tab for Multi-Warehouse Input
-  const [activeStockTab, setActiveStockTab] = useState<'DELIVERY' | 'STORE' | 'WHOLESALE'>('DELIVERY');
 
   // Color Variants State
   const [colors, setColors] = useState<ColorInputItem[]>([
@@ -144,9 +141,37 @@ export default function AddProductModal({
 
   const isEditMode = !!productToEdit;
 
+  // Context Descriptions
+  const getContextMeta = () => {
+    switch (activeWarehouse) {
+      case 'DELIVERY':
+        return {
+          title: 'مخزون التوصيل والتجزئة (Delivery Stock)',
+          badgeColor: 'bg-[#8A2B43] text-white',
+          icon: ShoppingBag,
+          description: 'تعديل أسعار وكميات التجزئة الإلكترونية الخاصة بالتوصيل للمنازل والمحطات.',
+        };
+      case 'STORE':
+        return {
+          title: 'مخزون المحل ونقطة البيع (POS Store Stock)',
+          badgeColor: 'bg-emerald-700 text-white',
+          icon: Store,
+          description: 'تعديل أسعار وكميات البيع في المحل الفيزيائي بالشلف.',
+        };
+      case 'WHOLESALE':
+        return {
+          title: 'مخزون الجملة والسوبر قرو (Wholesale Stock)',
+          badgeColor: 'bg-purple-900 text-white',
+          icon: Boxes,
+          description: 'تعديل أسعار الجملة والسوبر قرو، ونظام السريات والطلب المسبق.',
+        };
+    }
+  };
+
+  const contextMeta = getContextMeta();
+
   // Form Reset
   const resetForm = () => {
-    setSalesTargetMode('BOTH');
     setNameAr('');
     setSelectedSupplierId('');
     setSupplierName('');
@@ -165,7 +190,6 @@ export default function AddProductModal({
     setIsStandardSize(false);
     setMinSize('S');
     setMaxSize('XL');
-    setActiveStockTab('DELIVERY');
     setColors([
       {
         id: 'c-1',
@@ -190,7 +214,6 @@ export default function AddProductModal({
       setIsLoadingLoadingSuppliers(true);
 
       try {
-        // 1. Fetch Categories
         const { data: catData } = await supabase
           .from('categories')
           .select('*')
@@ -205,7 +228,6 @@ export default function AddProductModal({
           setCategories(mappedCats);
         }
 
-        // 2. Fetch Suppliers
         const { data: supData } = await supabase
           .from('suppliers')
           .select('*')
@@ -484,15 +506,15 @@ export default function AddProductModal({
     );
   };
 
-  // Update Stock Quantities per Warehouse Tab
+  // Update Stock Quantities for currently active warehouse
   const handleUpdateStockQuantity = (colorId: string, size: string, qty: number) => {
     setColors((prev) =>
       prev.map((c) => {
         if (c.id !== colorId) return c;
         const targetMapKey =
-          activeStockTab === 'DELIVERY'
+          activeWarehouse === 'DELIVERY'
             ? 'deliveryStocks'
-            : activeStockTab === 'STORE'
+            : activeWarehouse === 'STORE'
             ? 'storeStocks'
             : 'wholesaleStocks';
 
@@ -519,13 +541,9 @@ export default function AddProductModal({
   const insertVariantsWithResilience = async (rows: any[]): Promise<boolean> => {
     if (rows.length === 0) return true;
 
-    // Strategy 1: Try full insert
     let { error } = await supabase.from('product_variants').insert(rows);
     if (!error) return true;
 
-    console.warn('Full variant insert notice, attempting fallback 1 (size_name):', error.message);
-
-    // Strategy 2: Fallback to size_name
     const fallbackRows1 = rows.map((r) => ({
       product_id: r.product_id,
       color_name: r.color_name,
@@ -540,9 +558,6 @@ export default function AddProductModal({
     let { error: err1 } = await supabase.from('product_variants').insert(fallbackRows1);
     if (!err1) return true;
 
-    console.warn('Fallback 1 notice, attempting fallback 2 (size):', err1.message);
-
-    // Strategy 3: Fallback to size
     const fallbackRows2 = rows.map((r) => ({
       product_id: r.product_id,
       color_name: r.color_name,
@@ -560,7 +575,7 @@ export default function AddProductModal({
     return false;
   };
 
-  // Synchronous Supabase Insert/Update
+  // Context-Isolated Supabase Submit Handler
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -569,8 +584,13 @@ export default function AddProductModal({
       return;
     }
 
-    if (!sellingPrice || Number(sellingPrice) <= 0) {
+    if (activeWarehouse !== 'WHOLESALE' && (!sellingPrice || Number(sellingPrice) <= 0)) {
       alert('الرجاء إدخال سعر البيع الحالي بشكل صحيح');
+      return;
+    }
+
+    if (activeWarehouse === 'WHOLESALE' && (!wholesalePrice || Number(wholesalePrice) <= 0)) {
+      alert('الرجاء إدخال سعر البيع بالجملة بشكل صحيح');
       return;
     }
 
@@ -585,44 +605,77 @@ export default function AddProductModal({
     setIsSubmitting(true);
 
     try {
-      // 1. Base Product Payload with Wholesale & Super Gros fields
-      const productPayload = {
+      // Fetch existing DB variants if in edit mode to preserve stocks of other non-active warehouses
+      let existingDbVariants: any[] = [];
+      if (isEditMode && productToEdit) {
+        const { data: dbVars } = await supabase
+          .from('product_variants')
+          .select('*')
+          .eq('product_id', productToEdit.id);
+
+        if (dbVars) existingDbVariants = dbVars;
+      }
+
+      // Build Context-Isolated Base Product Payload
+      const productPayload: Record<string, any> = {
         name: nameAr.trim(),
         sku: finalSku,
         category_id: categoryId || null,
-        supplier_name: salesTargetMode === 'WHOLESALE' ? null : supplierName.trim() || null,
-        supplier_phone: salesTargetMode === 'WHOLESALE' ? null : supplierPhone.trim() || null,
         cost_price: Number(costPrice) || 0,
-        selling_price: Number(sellingPrice) || 0,
-        old_price: oldPrice !== '' ? Number(oldPrice) : null,
-        wholesale_price: wholesalePrice !== '' ? Number(wholesalePrice) : null,
-        super_gros_price: superGrosPrice !== '' ? Number(superGrosPrice) : null,
-        units_per_serie: Number(unitsPerSerie) || 4,
-        min_wholesale_series: Number(minWholesaleSeries) || 1,
-        super_gros_threshold: Number(superGrosThreshold) || 10,
-        is_sur_commande: isSurCommande,
         description: description.trim() || null,
         image_url: activeColors[0]?.imageUrl || null,
       };
 
-      const selectedCat = categories.find((cat) => cat.id === categoryId);
+      if (activeWarehouse === 'DELIVERY' || activeWarehouse === 'STORE') {
+        productPayload.supplier_name = supplierName.trim() || null;
+        productPayload.supplier_phone = supplierPhone.trim() || null;
+        productPayload.selling_price = Number(sellingPrice) || 0;
+        productPayload.old_price = oldPrice !== '' ? Number(oldPrice) : null;
+      }
 
+      if (activeWarehouse === 'WHOLESALE') {
+        productPayload.wholesale_price = wholesalePrice !== '' ? Number(wholesalePrice) : null;
+        productPayload.super_gros_price = superGrosPrice !== '' ? Number(superGrosPrice) : null;
+        productPayload.units_per_serie = Number(unitsPerSerie) || 4;
+        productPayload.min_wholesale_series = Number(minWholesaleSeries) || 1;
+        productPayload.super_gros_threshold = Number(superGrosThreshold) || 10;
+        productPayload.is_sur_commande = isSurCommande;
+      }
+
+      const selectedCat = categories.find((cat) => cat.id === categoryId);
       const generatedVariants: ProductVariant[] = [];
+
       activeColors.forEach((c) => {
         c.activeSizes.forEach((s) => {
-          const delVal = c.deliveryStocks[s] !== undefined ? c.deliveryStocks[s] : 10;
-          const storeVal = c.storeStocks[s] !== undefined ? c.storeStocks[s] : 5;
-          const wsVal = isSurCommande ? 0 : c.wholesaleStocks[s] !== undefined ? c.wholesaleStocks[s] : 20;
+          // Find matching existing variant from DB if present
+          const existingV = existingDbVariants.find(
+            (ev) =>
+              (ev.color_name === c.colorName.trim() || ev.color === c.colorName.trim()) &&
+              (ev.size === s || ev.size_name === s)
+          );
+
+          let finalDel = existingV ? Number(existingV.delivery_stock) || 0 : 10;
+          let finalStore = existingV ? Number(existingV.store_stock) || 0 : 5;
+          let finalWs = existingV ? Number(existingV.wholesale_stock) || 0 : 20;
+
+          // Scope stock update strictly to active warehouse
+          if (activeWarehouse === 'DELIVERY') {
+            finalDel = c.deliveryStocks[s] !== undefined ? c.deliveryStocks[s] : 10;
+          } else if (activeWarehouse === 'STORE') {
+            finalStore = c.storeStocks[s] !== undefined ? c.storeStocks[s] : 5;
+          } else if (activeWarehouse === 'WHOLESALE') {
+            finalWs = isSurCommande ? 0 : c.wholesaleStocks[s] !== undefined ? c.wholesaleStocks[s] : 20;
+          }
 
           generatedVariants.push({
-            id: `v-${Date.now()}-${c.colorName}-${s}`,
+            id: existingV ? String(existingV.id) : `v-${Date.now()}-${c.colorName}-${s}`,
             productId: isEditMode && productToEdit ? productToEdit.id : '',
             size: s,
             color: c.colorName.trim(),
-            deliveryStock: delVal,
-            storeStock: storeVal,
-            wholesaleStock: wsVal,
-            isSurCommande: isSurCommande,
+            deliveryStock: finalDel,
+            storeStock: finalStore,
+            wholesaleStock: finalWs,
+            isSurCommande: activeWarehouse === 'WHOLESALE' ? isSurCommande : productToEdit?.isSurCommande,
           });
         });
       });
@@ -641,29 +694,20 @@ export default function AddProductModal({
           return;
         }
 
-        // Clean & Re-insert variants
+        // Clean & Re-insert variants with merged stocks
         await supabase.from('product_variants').delete().eq('product_id', productToEdit.id);
 
-        const variantRows: any[] = [];
-        activeColors.forEach((c) => {
-          c.activeSizes.forEach((s) => {
-            const delVal = c.deliveryStocks[s] !== undefined ? c.deliveryStocks[s] : 10;
-            const storeVal = c.storeStocks[s] !== undefined ? c.storeStocks[s] : 5;
-            const wsVal = isSurCommande ? 0 : c.wholesaleStocks[s] !== undefined ? c.wholesaleStocks[s] : 20;
-
-            variantRows.push({
-              product_id: productToEdit.id,
-              color_name: c.colorName.trim(),
-              color_image_url: c.imageUrl.trim() || null,
-              size: s,
-              size_name: s,
-              delivery_stock: delVal,
-              store_stock: storeVal,
-              wholesale_stock: wsVal,
-              is_sur_commande: isSurCommande,
-            });
-          });
-        });
+        const variantRows = generatedVariants.map((v) => ({
+          product_id: productToEdit.id,
+          color_name: v.color,
+          color_image_url: activeColors.find((c) => c.colorName.trim() === v.color)?.imageUrl || null,
+          size: v.size,
+          size_name: v.size,
+          delivery_stock: v.deliveryStock,
+          store_stock: v.storeStock,
+          wholesale_stock: v.wholesaleStock,
+          is_sur_commande: v.isSurCommande,
+        }));
 
         const success = await insertVariantsWithResilience(variantRows);
         if (!success) {
@@ -677,23 +721,29 @@ export default function AddProductModal({
           nameAr: nameAr.trim(),
           categoryId: categoryId || undefined,
           categoryNameAr: selectedCat?.name || undefined,
-          supplierName: salesTargetMode === 'WHOLESALE' ? undefined : supplierName.trim() || undefined,
-          supplierPhone: salesTargetMode === 'WHOLESALE' ? undefined : supplierPhone.trim() || undefined,
           costPrice: Number(costPrice) || 0,
-          sellingPrice: Number(sellingPrice) || 0,
-          oldPrice: oldPrice !== '' ? Number(oldPrice) : null,
-          wholesalePrice: wholesalePrice !== '' ? Number(wholesalePrice) : null,
-          superGrosPrice: superGrosPrice !== '' ? Number(superGrosPrice) : null,
-          unitsPerSerie: Number(unitsPerSerie) || 4,
-          minWholesaleSeries: Number(minWholesaleSeries) || 1,
-          superGrosThreshold: Number(superGrosThreshold) || 10,
-          isSurCommande: isSurCommande,
           description: description.trim() || undefined,
           imageUrl: activeColors[0]?.imageUrl || undefined,
           colors: activeColors.map((c) => ({ colorName: c.colorName, imageUrl: c.imageUrl })),
           sizes: generatedSizesList,
           variants: generatedVariants,
         };
+
+        if (activeWarehouse === 'DELIVERY' || activeWarehouse === 'STORE') {
+          updatedProdObj.supplierName = supplierName.trim() || undefined;
+          updatedProdObj.supplierPhone = supplierPhone.trim() || undefined;
+          updatedProdObj.sellingPrice = Number(sellingPrice) || 0;
+          updatedProdObj.oldPrice = oldPrice !== '' ? Number(oldPrice) : null;
+        }
+
+        if (activeWarehouse === 'WHOLESALE') {
+          updatedProdObj.wholesalePrice = wholesalePrice !== '' ? Number(wholesalePrice) : null;
+          updatedProdObj.superGrosPrice = superGrosPrice !== '' ? Number(superGrosPrice) : null;
+          updatedProdObj.unitsPerSerie = Number(unitsPerSerie) || 4;
+          updatedProdObj.minWholesaleSeries = Number(minWholesaleSeries) || 1;
+          updatedProdObj.superGrosThreshold = Number(superGrosThreshold) || 10;
+          updatedProdObj.isSurCommande = isSurCommande;
+        }
 
         if (onProductUpdated) {
           onProductUpdated(updatedProdObj);
@@ -705,7 +755,7 @@ export default function AddProductModal({
           await reFetchProducts();
         }
 
-        alert('تم تعديل وحفظ المنتج بنجاح في قاعدة البيانات! ✅');
+        alert(`تم تعديل وحفظ بيانات المنتج بنجاح في سياق (${contextMeta.title})! ✅`);
       } else {
         // INSERT new product
         let insertedProductId = `prod-${Date.now()}`;
@@ -725,26 +775,17 @@ export default function AddProductModal({
         if (prodData) {
           insertedProductId = String(prodData.id);
 
-          const variantRows: any[] = [];
-          activeColors.forEach((c) => {
-            c.activeSizes.forEach((s) => {
-              const delVal = c.deliveryStocks[s] !== undefined ? c.deliveryStocks[s] : 10;
-              const storeVal = c.storeStocks[s] !== undefined ? c.storeStocks[s] : 5;
-              const wsVal = isSurCommande ? 0 : c.wholesaleStocks[s] !== undefined ? c.wholesaleStocks[s] : 20;
-
-              variantRows.push({
-                product_id: insertedProductId,
-                color_name: c.colorName.trim(),
-                color_image_url: c.imageUrl.trim() || null,
-                size: s,
-                size_name: s,
-                delivery_stock: delVal,
-                store_stock: storeVal,
-                wholesale_stock: wsVal,
-                is_sur_commande: isSurCommande,
-              });
-            });
-          });
+          const variantRows = generatedVariants.map((v) => ({
+            product_id: insertedProductId,
+            color_name: v.color,
+            color_image_url: activeColors.find((c) => c.colorName.trim() === v.color)?.imageUrl || null,
+            size: v.size,
+            size_name: v.size,
+            delivery_stock: v.deliveryStock,
+            store_stock: v.storeStock,
+            wholesale_stock: v.wholesaleStock,
+            is_sur_commande: v.isSurCommande,
+          }));
 
           const success = await insertVariantsWithResilience(variantRows);
           if (!success) {
@@ -759,8 +800,6 @@ export default function AddProductModal({
           nameAr: nameAr.trim(),
           categoryId: categoryId || undefined,
           categoryNameAr: selectedCat?.name || undefined,
-          supplierName: salesTargetMode === 'WHOLESALE' ? undefined : supplierName.trim() || undefined,
-          supplierPhone: salesTargetMode === 'WHOLESALE' ? undefined : supplierPhone.trim() || undefined,
           costPrice: Number(costPrice) || 0,
           sellingPrice: Number(sellingPrice) || 0,
           oldPrice: oldPrice !== '' ? Number(oldPrice) : null,
@@ -777,13 +816,18 @@ export default function AddProductModal({
           variants: generatedVariants,
         };
 
+        if (activeWarehouse !== 'WHOLESALE') {
+          newProduct.supplierName = supplierName.trim() || undefined;
+          newProduct.supplierPhone = supplierPhone.trim() || undefined;
+        }
+
         onProductAdded(newProduct);
 
         if (reFetchProducts) {
           await reFetchProducts();
         }
 
-        alert('تم حفظ المنتج بنجاح في قاعدة البيانات! ✅');
+        alert(`تم إضافة المنتج بنجاح في سياق (${contextMeta.title})! ✅`);
       }
 
       resetForm();
@@ -799,23 +843,27 @@ export default function AddProductModal({
   if (!isOpen) return null;
 
   const discountPercent = calculateDiscountPercentage();
+  const ContextIcon = contextMeta.icon;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm dir-rtl" dir="rtl">
       <div className="bg-white w-full max-w-4xl rounded-3xl shadow-2xl border border-gray-100 flex flex-col max-h-[90vh] overflow-hidden animate-scale-up">
-        {/* Modal Header */}
+        {/* Context-Aware Modal Header */}
         <div className="p-5 sm:p-6 bg-gradient-to-r from-[#8A2B43] to-[#7A1C32] text-white flex items-center justify-between shrink-0 shadow-md">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center border border-white/20">
-              <Package className="w-5 h-5 text-pyjama-pink" />
+              <ContextIcon className="w-5 h-5 text-pyjama-pink" />
             </div>
             <div>
-              <h2 className="text-lg sm:text-xl font-bold">
-                {isEditMode ? 'تعديل بيانات المنتج (Edit Product)' : 'إضافة منتج جديد (Add New Product)'}
-              </h2>
-              <p className="text-xs text-white/80 mt-0.5">
-                إسناد المخزون المستقل للمستودعات 3 + إعدادات البيع بالجملة و(السوبر قرو) ونظام السلسلة
-              </p>
+              <div className="flex items-center gap-2">
+                <h2 className="text-lg sm:text-xl font-bold">
+                  {isEditMode ? 'تعديل بيانات المنتج' : 'إضافة منتج جديد'}
+                </h2>
+                <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold ${contextMeta.badgeColor}`}>
+                  {contextMeta.title}
+                </span>
+              </div>
+              <p className="text-xs text-white/80 mt-0.5">{contextMeta.description}</p>
             </div>
           </div>
 
@@ -828,40 +876,23 @@ export default function AddProductModal({
           </button>
         </div>
 
-        {/* Sales Target Mode Selector */}
-        <div className="px-6 pt-4 bg-pyjama-cream/30 border-b border-gray-100 flex items-center gap-2">
-          <span className="text-xs font-bold text-gray-600 ml-2">نوع العرض والبيع:</span>
-          <button
-            type="button"
-            onClick={() => setSalesTargetMode('BOTH')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-              salesTargetMode === 'BOTH'
-                ? 'bg-[#8A2B43] text-white shadow-sm'
-                : 'bg-white text-gray-600 border border-gray-200'
-            }`}
-          >
-            تجزئة + جملة (عام)
-          </button>
-          <button
-            type="button"
-            onClick={() => setSalesTargetMode('WHOLESALE')}
-            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-              salesTargetMode === 'WHOLESALE'
-                ? 'bg-[#8A2B43] text-white shadow-sm'
-                : 'bg-white text-gray-600 border border-gray-200'
-            }`}
-          >
-            جملة فقط (Wholesale Only)
-          </button>
+        {/* Strict Warehouse Context Isolation Notice Bar */}
+        <div className="px-6 py-2.5 bg-amber-50/80 border-b border-amber-100 flex items-center justify-between text-xs text-amber-900 font-medium">
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-4 h-4 text-amber-700 shrink-0" />
+            <span>
+              نظام التعديل المعزول بالسياق مفّعل تلقائياً: يتم حظر تعديل كميات أو أسعار المستودعات الأخرى لمنع التضارب.
+            </span>
+          </div>
         </div>
 
         {/* Modal Scrollable Body Form */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-8 flex-1">
-          {/* SECTION A: Basic Info & Supplier Integration */}
+          {/* SECTION A: Basic Info & Context-Aware Supplier Integration */}
           <div className="space-y-4 bg-pyjama-cream/40 p-5 rounded-3xl border border-gray-100">
             <h3 className="text-sm font-bold text-[#7A1C32] flex items-center gap-2 border-b border-gray-200/80 pb-3">
               <Grid className="w-4 h-4 text-[#8A2B43]" />
-              <span>أولاً: البيانات الأساسية {salesTargetMode !== 'WHOLESALE' && 'والمورّد'}</span>
+              <span>أولاً: البيانات الأساسية {activeWarehouse !== 'WHOLESALE' && 'والمورّد'}</span>
             </h3>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -928,8 +959,8 @@ export default function AddProductModal({
                 </div>
               </div>
 
-              {/* HIDE SUPPLIER FIELD IN DEDICATED WHOLESALE MODE */}
-              {salesTargetMode !== 'WHOLESALE' && (
+              {/* HIDE SUPPLIER DETAILS COMPLETELY IN WHOLESALE WAREHOUSE CONTEXT */}
+              {activeWarehouse !== 'WHOLESALE' && (
                 <>
                   {/* Supplier Dropdown */}
                   <div>
@@ -984,15 +1015,15 @@ export default function AddProductModal({
             </div>
           </div>
 
-          {/* SECTION B: Pricing & Volume Promotions (DZD) */}
+          {/* SECTION B: Context-Aware Pricing Section */}
           <div className="space-y-4 bg-pyjama-cream/40 p-5 rounded-3xl border border-gray-100">
             <div className="flex items-center justify-between border-b border-gray-200/80 pb-3">
               <h3 className="text-sm font-bold text-[#7A1C32] flex items-center gap-2">
                 <DollarSign className="w-4 h-4 text-[#8A2B43]" />
-                <span>ثانياً: هيكلة الأسعار والتخفيضات (DZD Pricing)</span>
+                <span>ثانياً: أسعار المستودع النشط ({activeWarehouse === 'DELIVERY' ? 'التوصيل' : activeWarehouse === 'STORE' ? 'المحل' : 'الجملة'})</span>
               </h3>
 
-              {discountPercent !== null && (
+              {discountPercent !== null && activeWarehouse !== 'WHOLESALE' && (
                 <span className="px-3 py-1 bg-rose-100 text-rose-700 border border-rose-200 rounded-full text-xs font-bold flex items-center gap-1 animate-pulse">
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>خصم {discountPercent}% 🔥</span>
@@ -1000,7 +1031,7 @@ export default function AddProductModal({
               )}
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {/* Cost Price */}
               <div>
                 <label className="block text-xs font-bold text-gray-700 mb-1">
@@ -1015,151 +1046,155 @@ export default function AddProductModal({
                 />
               </div>
 
-              {/* Current Selling Price (Retail) */}
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  سعر البيع بالتجزئة (Vente DZD) <span className="text-rose-500">*</span>
-                </label>
-                <input
-                  type="number"
-                  value={sellingPrice}
-                  onChange={(e) => setSellingPrice(e.target.value === '' ? '' : Number(e.target.value))}
-                  placeholder="0"
-                  className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold text-[#8A2B43] focus:outline-none focus:border-[#8A2B43] shadow-sm"
-                  required
-                />
-              </div>
+              {/* RETAIL / STORE PRICES SHOWN ONLY IN DELIVERY & STORE CONTEXTS */}
+              {activeWarehouse !== 'WHOLESALE' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      {activeWarehouse === 'DELIVERY' ? 'سعر البيع بالتجزئة الإلكترونية (DZD)' : 'سعر البيع بمحل الشلف (DZD)'} <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      value={sellingPrice}
+                      onChange={(e) => setSellingPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                      placeholder="0"
+                      className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold text-[#8A2B43] focus:outline-none focus:border-[#8A2B43] shadow-sm"
+                      required
+                    />
+                  </div>
 
-              {/* Old Price Before Discount */}
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  السعر القديم قبل الخصم (DZD)
-                </label>
-                <input
-                  type="number"
-                  value={oldPrice}
-                  onChange={(e) => setOldPrice(e.target.value === '' ? '' : Number(e.target.value))}
-                  placeholder="0"
-                  className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold text-gray-400 focus:outline-none focus:border-[#8A2B43] shadow-sm"
-                />
-              </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-1">
+                      السعر القديم قبل الخصم (DZD)
+                    </label>
+                    <input
+                      type="number"
+                      value={oldPrice}
+                      onChange={(e) => setOldPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                      placeholder="0"
+                      className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold text-gray-400 focus:outline-none focus:border-[#8A2B43] shadow-sm"
+                    />
+                  </div>
+                </>
+              )}
 
-              {/* Standard Wholesale Price */}
-              <div>
-                <label className="block text-xs font-bold text-gray-700 mb-1">
-                  سعر البيع بالجملة (Prix Gros DZD)
-                </label>
-                <input
-                  type="number"
-                  value={wholesalePrice}
-                  onChange={(e) => setWholesalePrice(e.target.value === '' ? '' : Number(e.target.value))}
-                  placeholder="0"
-                  className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-[#8A2B43] shadow-sm"
-                />
-              </div>
+              {/* WHOLESALE & SUPER GROS PRICES SHOWN ONLY IN WHOLESALE WAREHOUSE CONTEXT */}
+              {activeWarehouse === 'WHOLESALE' && (
+                <>
+                  <div>
+                    <label className="block text-xs font-bold text-purple-900 mb-1">
+                      سعر البيع بالجملة العادي (Prix Gros DZD) <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      value={wholesalePrice}
+                      onChange={(e) => setWholesalePrice(e.target.value === '' ? '' : Number(e.target.value))}
+                      placeholder="0"
+                      className="w-full px-4 py-3 bg-white rounded-xl border border-purple-200 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-purple-800 shadow-sm"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-purple-900 mb-1">
+                      سعر البيع بالجملة الكبيرة (Prix Super Gros DZD)
+                    </label>
+                    <input
+                      type="number"
+                      value={superGrosPrice}
+                      onChange={(e) => setSuperGrosPrice(e.target.value === '' ? '' : Number(e.target.value))}
+                      placeholder="مثال: 2800"
+                      className="w-full px-4 py-3 bg-white rounded-xl border border-purple-200 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-purple-800 shadow-sm"
+                    />
+                  </div>
+                </>
+              )}
             </div>
           </div>
 
-          {/* SECTION C: DEDICATED WHOLESALE (مخزون الجملة) BUSINESS LOGIC */}
-          <div className="space-y-5 bg-purple-50/50 p-5 rounded-3xl border border-purple-100">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-purple-200/80 pb-3">
-              <h3 className="text-sm font-bold text-purple-900 flex items-center gap-2">
-                <Boxes className="w-5 h-5 text-purple-700" />
-                <span>ثالثاً: نظام الجملة المتقدم وسعر (السوبر قرو) ونظام السلسلة (Wholesale System)</span>
-              </h3>
+          {/* SECTION C: WHOLESALE SYSTEM SECTION (SHOWN STRICTLY IN WHOLESALE CONTEXT) */}
+          {activeWarehouse === 'WHOLESALE' && (
+            <div className="space-y-5 bg-purple-50/60 p-5 rounded-3xl border border-purple-100">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-purple-200/80 pb-3">
+                <h3 className="text-sm font-bold text-purple-900 flex items-center gap-2">
+                  <Boxes className="w-5 h-5 text-purple-700" />
+                  <span>ثالثاً: إعدادات السريات والطلب المسبق بالجملة (Wholesale Série System)</span>
+                </h3>
 
-              {/* Sur Commande / Made to Order Checkbox Toggle */}
-              <label className="flex items-center gap-2 cursor-pointer bg-white px-3 py-1.5 rounded-xl border border-purple-200 shadow-xs">
-                <input
-                  type="checkbox"
-                  checked={isSurCommande}
-                  onChange={(e) => setIsSurCommande(e.target.checked)}
-                  className="w-4 h-4 accent-purple-800 rounded cursor-pointer"
-                />
-                <span className="text-xs font-bold text-purple-900">
-                  متوفر على الطلب (Sur Commande / Made to Order)
-                </span>
-              </label>
-            </div>
-
-            {/* Wholesale Thresholds & Pricing Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {/* 1. Super Gros Price */}
-              <div>
-                <label className="block text-xs font-bold text-purple-900 mb-1">
-                  سعر الجملة الكبيرة (Prix Super Gros DZD)
+                {/* Sur Commande Checkbox Toggle */}
+                <label className="flex items-center gap-2 cursor-pointer bg-white px-3.5 py-2 rounded-xl border border-purple-200 shadow-xs">
+                  <input
+                    type="checkbox"
+                    checked={isSurCommande}
+                    onChange={(e) => setIsSurCommande(e.target.checked)}
+                    className="w-4 h-4 accent-purple-800 rounded cursor-pointer"
+                  />
+                  <span className="text-xs font-bold text-purple-900">
+                    متوفر على الطلب (Sur Commande / Made to Order)
+                  </span>
                 </label>
-                <input
-                  type="number"
-                  value={superGrosPrice}
-                  onChange={(e) => setSuperGrosPrice(e.target.value === '' ? '' : Number(e.target.value))}
-                  placeholder="مثال: 2800"
-                  className="w-full px-4 py-3 bg-white rounded-xl border border-purple-200 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-purple-800 shadow-sm"
-                />
               </div>
 
-              {/* 2. Units Per Serie */}
-              <div>
-                <label className="block text-xs font-bold text-purple-900 mb-1">
-                  عدد القطع في السلسلة (Pack Size / Série)
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={unitsPerSerie}
-                  onChange={(e) => setUnitsPerSerie(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-full px-4 py-3 bg-white rounded-xl border border-purple-200 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-purple-800 shadow-sm"
-                />
+              {/* Wholesale Series Inputs */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-bold text-purple-900 mb-1">
+                    عدد القطع في السلسلة (Pack Size / Série)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={unitsPerSerie}
+                    onChange={(e) => setUnitsPerSerie(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-full px-4 py-3 bg-white rounded-xl border border-purple-200 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-purple-800 shadow-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-purple-900 mb-1">
+                    أقل عدد سريات بالجملة (Min Séries)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={minWholesaleSeries}
+                    onChange={(e) => setMinWholesaleSeries(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-full px-4 py-3 bg-white rounded-xl border border-purple-200 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-purple-800 shadow-sm"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-purple-900 mb-1">
+                    عتبة السوبر قرو (Super Gros Threshold)
+                  </label>
+                  <input
+                    type="number"
+                    min="1"
+                    value={superGrosThreshold}
+                    onChange={(e) => setSuperGrosThreshold(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-full px-4 py-3 bg-white rounded-xl border border-purple-200 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-purple-800 shadow-sm"
+                  />
+                </div>
               </div>
 
-              {/* 3. Minimum Series for Wholesale */}
-              <div>
-                <label className="block text-xs font-bold text-purple-900 mb-1">
-                  أقل عدد سريات للجملة (Min Séries)
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={minWholesaleSeries}
-                  onChange={(e) => setMinWholesaleSeries(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-full px-4 py-3 bg-white rounded-xl border border-purple-200 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-purple-800 shadow-sm"
-                />
-              </div>
-
-              {/* 4. Super Gros Series Threshold */}
-              <div>
-                <label className="block text-xs font-bold text-purple-900 mb-1">
-                  عتبة السوبر قرو (Super Gros Threshold)
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  value={superGrosThreshold}
-                  onChange={(e) => setSuperGrosThreshold(Math.max(1, parseInt(e.target.value) || 1))}
-                  className="w-full px-4 py-3 bg-white rounded-xl border border-purple-200 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-purple-800 shadow-sm"
-                />
+              <div className="p-3 bg-white/90 rounded-2xl border border-purple-200 text-xs text-purple-900 space-y-1">
+                <p className="font-bold flex items-center gap-1.5">
+                  <HelpCircle className="w-4 h-4 text-purple-700" />
+                  <span>تنبيه نظام السلسلة:</span>
+                </p>
+                <p className="text-[11px] text-purple-800">
+                  تفعيل خيار <strong>Sur Commande</strong> يتيح عرض المنتج في متجر الجملة للطلب المصنّعي المباشر دون الحاجة لإدخال أعداد مخزون فيزيائي مسبق.
+                </p>
               </div>
             </div>
-
-            <div className="p-3.5 bg-white/80 rounded-2xl border border-purple-200 text-xs text-purple-900 space-y-1">
-              <p className="font-bold flex items-center gap-1.5">
-                <HelpCircle className="w-4 h-4 text-purple-700" />
-                <span>قواعد نظام السلسلة والطلب المسبق:</span>
-              </p>
-              <ul className="list-disc list-inside space-y-0.5 text-[11px] text-purple-800 font-medium pr-2">
-                <li>كل سلسلة (Série) تخصص رسمياً لـ <strong>لون واحد فقط</strong> بمقاسات مختلفة.</li>
-                <li>تفعيل <strong>Sur Commande (الطلب المسبق)</strong> يعطّل أعداد المخزون الحقيقي للجملة ويعرض المنتج كمتاح للطلب المصنّعي.</li>
-                <li>الوصول إلى {superGrosThreshold} سريات يفعّل تلقائياً سعر <strong>السوبر قرو ({superGrosPrice || 0} DZD)</strong> في فاتورة التاجر.</li>
-              </ul>
-            </div>
-          </div>
+          )}
 
           {/* SECTION D: Flexible Size Selection System */}
           <div className="space-y-5 bg-pyjama-cream/40 p-5 rounded-3xl border border-gray-100">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-gray-200/80 pb-3">
               <h3 className="text-sm font-bold text-[#7A1C32] flex items-center gap-2">
                 <Ruler className="w-4 h-4 text-[#8A2B43]" />
-                <span>رابعاً: نظام اختيار المقاسات والمرونة (Flexible Size System)</span>
+                <span>{activeWarehouse === 'WHOLESALE' ? 'رابعاً' : 'ثالثاً'}: نظام المقاسات المتاحة (Flexible Size System)</span>
               </h3>
 
               {/* Quick Standard Size Button */}
@@ -1240,7 +1275,7 @@ export default function AddProductModal({
 
             {/* Generated Sizes Preview Badges */}
             <div className="p-4 bg-white rounded-2xl border border-gray-200 flex flex-wrap items-center gap-2 shadow-sm">
-              <span className="text-xs font-bold text-gray-600 ml-2">المقاسات المحدّدة تلقائياً:</span>
+              <span className="text-xs font-bold text-gray-600 ml-2">المقاسات المحدّدة:</span>
               {generatedSizesList.map((size) => (
                 <span
                   key={size}
@@ -1256,12 +1291,12 @@ export default function AddProductModal({
             </div>
           </div>
 
-          {/* SECTION E: Multi-Warehouse Stocks per Color & Size */}
+          {/* SECTION E: Context-Isolated Color Variants & Warehouse Stock Quantities */}
           <div className="space-y-6 bg-pyjama-cream/40 p-5 rounded-3xl border border-gray-100">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 border-b border-gray-200/80 pb-3">
               <h3 className="text-sm font-bold text-[#7A1C32] flex items-center gap-2">
                 <Palette className="w-4 h-4 text-[#8A2B43]" />
-                <span>خامساً: ألوان المنتج والمخزون المستقل للمستودعات 3 (Delivery / Store / Wholesale)</span>
+                <span>{activeWarehouse === 'WHOLESALE' ? 'خامساً' : 'رابعاً'}: ألوان المنتج وكميات ({contextMeta.title})</span>
               </h3>
 
               <button
@@ -1271,48 +1306,6 @@ export default function AddProductModal({
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>+ إضافة لون آخر</span>
-              </button>
-            </div>
-
-            {/* Warehouse Stock Selection Tabs */}
-            <div className="flex items-center gap-2 p-1.5 bg-white rounded-2xl border border-gray-200 w-fit">
-              <button
-                type="button"
-                onClick={() => setActiveStockTab('DELIVERY')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                  activeStockTab === 'DELIVERY'
-                    ? 'bg-[#8A2B43] text-white shadow-sm'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <ShoppingBag className="w-3.5 h-3.5" />
-                <span>مخزون التوصيل (Delivery)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveStockTab('STORE')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                  activeStockTab === 'STORE'
-                    ? 'bg-[#8A2B43] text-white shadow-sm'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <Store className="w-3.5 h-3.5" />
-                <span>مخزون المحل (POS Store)</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setActiveStockTab('WHOLESALE')}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
-                  activeStockTab === 'WHOLESALE'
-                    ? 'bg-purple-900 text-white shadow-sm'
-                    : 'text-gray-600 hover:bg-gray-100'
-                }`}
-              >
-                <Boxes className="w-3.5 h-3.5" />
-                <span>مخزون الجملة (Wholesale)</span>
               </button>
             </div>
 
@@ -1384,7 +1377,7 @@ export default function AddProductModal({
                   {/* Middle: Direct Image File Upload Dropzone */}
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1.5">
-                      صورة هذا اللون المخصصة (Direct Image Upload)
+                      صورة هذا اللون (Direct Image Upload)
                     </label>
 
                     {colorItem.imageUrl ? (
@@ -1421,7 +1414,7 @@ export default function AddProductModal({
                       <label className="border-2 border-dashed border-gray-200 hover:border-[#8A2B43] bg-pyjama-cream/20 hover:bg-pyjama-cream/40 rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all">
                         <UploadCloud className="w-8 h-8 text-[#8A2B43] mb-2" />
                         <span className="text-xs font-bold text-gray-700">انقر هنا أو اسحب الصورة لرفع صورة هذا اللون مباشرة</span>
-                        <span className="text-[10px] text-gray-400 mt-1">يدعم JPG, PNG, WEBP من الهاتف أو الحاسوب</span>
+                        <span className="text-[10px] text-gray-400 mt-1">يدعم JPG, PNG, WEBP</span>
                         <input
                           type="file"
                           accept="image/*"
@@ -1435,11 +1428,11 @@ export default function AddProductModal({
                     )}
                   </div>
 
-                  {/* Bottom: Dynamic Sizes & Stock Quantities for Selected Warehouse Tab */}
+                  {/* Bottom: Context-Isolated Stock Quantities Input */}
                   <div className="space-y-3 pt-2 border-t border-gray-100">
                     <div className="flex items-center justify-between">
                       <span className="text-xs font-bold text-gray-700">
-                        كميات المخزون ({activeStockTab === 'DELIVERY' ? 'التوصيل' : activeStockTab === 'STORE' ? 'المحل' : 'الجملة'}) للون ({colorItem.colorName || `لون ${index + 1}`}):
+                        كميات مخزون ({activeWarehouse === 'DELIVERY' ? 'التوصيل' : activeWarehouse === 'STORE' ? 'المحل' : 'الجملة'}) للون ({colorItem.colorName || `لون ${index + 1}`}):
                       </span>
 
                       <div className="flex items-center gap-2">
@@ -1461,24 +1454,25 @@ export default function AddProductModal({
                       </div>
                     </div>
 
-                    {/* Sur Commande Notice if active */}
-                    {activeStockTab === 'WHOLESALE' && isSurCommande ? (
-                      <div className="p-3 bg-amber-50 border border-amber-200 rounded-xl text-xs font-bold text-amber-900 text-center">
-                        ⚠️ خيار الطلب المسبق (Sur Commande) مفّعل: لا يلزم إدخال كميات مخزون جملة مادية.
+                    {/* Sur Commande Wholesale Notice */}
+                    {activeWarehouse === 'WHOLESALE' && isSurCommande ? (
+                      <div className="p-3.5 bg-purple-50 border border-purple-200 rounded-2xl text-xs font-bold text-purple-900 text-center flex items-center justify-center gap-2">
+                        <Clock className="w-4 h-4 text-purple-700" />
+                        <span>خيار الطلب المسبق (Sur Commande) مفّعل: هذا المنتج متاح للطلب المصنّعي بدون حجز كميات مخزون فيزيائي.</span>
                       </div>
                     ) : (
-                      /* Chips & Quantities Grid */
+                      /* Chips & Quantities Grid for Active Warehouse ONLY */
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
                         {generatedSizesList.map((size) => {
                           const isActive = colorItem.activeSizes.includes(size);
                           const targetMap =
-                            activeStockTab === 'DELIVERY'
+                            activeWarehouse === 'DELIVERY'
                               ? colorItem.deliveryStocks
-                              : activeStockTab === 'STORE'
+                              : activeWarehouse === 'STORE'
                               ? colorItem.storeStocks
                               : colorItem.wholesaleStocks;
 
-                          const qtyVal = targetMap[size] ?? (activeStockTab === 'DELIVERY' ? 10 : activeStockTab === 'STORE' ? 5 : 20);
+                          const qtyVal = targetMap[size] ?? (activeWarehouse === 'DELIVERY' ? 10 : activeWarehouse === 'STORE' ? 5 : 20);
 
                           return (
                             <div
@@ -1535,7 +1529,7 @@ export default function AddProductModal({
           <div className="space-y-3 bg-pyjama-cream/40 p-5 rounded-3xl border border-gray-100">
             <h3 className="text-sm font-bold text-[#7A1C32] flex items-center gap-2 border-b border-gray-200/80 pb-3">
               <FileText className="w-4 h-4 text-[#8A2B43]" />
-              <span>سادساً: الوصف وتفاصيل القماش (Description & Notes)</span>
+              <span>{activeWarehouse === 'WHOLESALE' ? 'سادساً' : 'خامساً'}: الوصف وتفاصيل القماش (Description)</span>
             </h3>
 
             <textarea
@@ -1570,8 +1564,8 @@ export default function AddProductModal({
                   <CheckCircle className="w-4 h-4" />
                   <span>
                     {isEditMode
-                      ? 'تحديث وتعديل المنتج (Update Product)'
-                      : 'حفظ المنتج في قاعدة البيانات (Save Product)'}
+                      ? `تحديث وحفظ بيانات سياق (${activeWarehouse === 'DELIVERY' ? 'التوصيل' : activeWarehouse === 'STORE' ? 'المحل' : 'الجملة'})`
+                      : `حفظ المنتج في سياق (${activeWarehouse === 'DELIVERY' ? 'التوصيل' : activeWarehouse === 'STORE' ? 'المحل' : 'الجملة'})`}
                   </span>
                 </>
               )}

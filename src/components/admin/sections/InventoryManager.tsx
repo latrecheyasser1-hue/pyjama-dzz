@@ -39,11 +39,11 @@ export default function InventoryManager({
   const getDynamicTitle = (type: StockType) => {
     switch (type) {
       case 'DELIVERY':
-        return 'المخزون والمستودعات • مخزون التوصيل';
+        return 'المخزون والمستودعات • مخزون التوصيل (Delivery Warehouse)';
       case 'STORE':
-        return 'المخزون والمستودعات • مخزون المحل';
+        return 'المخزون والمستودعات • مخزون المحل (POS Store Warehouse)';
       case 'WHOLESALE':
-        return 'المخزون والمستودعات • مخزون الجملة';
+        return 'المخزون والمستودعات • مخزون الجملة (Wholesale Warehouse)';
       default:
         return 'المخزون والمستودعات';
     }
@@ -82,7 +82,7 @@ export default function InventoryManager({
             {getDynamicTitle(activeStockTab)}
           </h2>
           <p className="text-xs text-gray-500 font-medium">
-            متابعة دقيقة بكميات المخزون والمقاسات والألوان حسب الأقسام
+            متابعة وإدارة التغييرات المعزولة بالسياق للمستودع النشط حالياً
           </p>
         </div>
 
@@ -106,7 +106,9 @@ export default function InventoryManager({
             className="flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#8A2B43] hover:bg-[#7A1C32] text-white text-xs font-bold shadow-md transition-all shrink-0"
           >
             <Plus className="w-4 h-4" />
-            <span>إضافة منتج جديد (New Product)</span>
+            <span>
+              إضافة منتج في هذا المستودع ({activeStockTab === 'DELIVERY' ? 'التوصيل' : activeStockTab === 'STORE' ? 'المحل' : 'الجملة'})
+            </span>
           </button>
         </div>
       </div>
@@ -121,10 +123,11 @@ export default function InventoryManager({
         onEditProduct={handleEditProduct}
       />
 
-      {/* Add / Edit Product Modal */}
+      {/* Add / Edit Product Modal with Strict Warehouse Context Isolation */}
       <AddProductModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
+        activeWarehouse={activeStockTab}
         onProductAdded={handleProductCreated}
         onProductUpdated={handleProductUpdated}
         reFetchProducts={reFetchProducts}
