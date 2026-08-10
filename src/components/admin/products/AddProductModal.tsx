@@ -1015,7 +1015,7 @@ export default function AddProductModal({
         const variantRows = generatedVariants.map((v) => ({
           product_id: productToEdit.id,
           color_name: v.color,
-          color_image_url: activeColors.find((c) => c.colorName.trim() === v.color)?.imageUrl || null,
+          color_image_url: sanitizedColors.find((c) => c.colorName.trim() === v.color)?.imageUrl || null,
           size: v.size,
           size_name: v.size,
           delivery_stock: v.deliveryStock,
@@ -1038,8 +1038,8 @@ export default function AddProductModal({
           categoryNameAr: selectedCat?.name || undefined,
           costPrice: Number(costPrice) || 0,
           description: description.trim() || undefined,
-          imageUrl: activeColors[0]?.imageUrl || undefined,
-          colors: activeColors.map((c) => ({ colorName: c.colorName, imageUrl: c.imageUrl })),
+          imageUrl: sanitizedColors[0]?.imageUrl || undefined,
+          colors: sanitizedColors.map((c) => ({ colorName: c.colorName, imageUrl: c.imageUrl || undefined })),
           sizes: generatedSizesList,
           variants: generatedVariants,
         };
@@ -1094,7 +1094,7 @@ export default function AddProductModal({
           const variantRows = generatedVariants.map((v) => ({
             product_id: insertedProductId,
             color_name: v.color,
-            color_image_url: activeColors.find((c) => c.colorName.trim() === v.color)?.imageUrl || null,
+            color_image_url: sanitizedColors.find((c) => c.colorName.trim() === v.color)?.imageUrl || null,
             size: v.size,
             size_name: v.size,
             delivery_stock: v.deliveryStock,
@@ -1128,8 +1128,8 @@ export default function AddProductModal({
           minWholesaleSeries: Number(minWholesaleSeries) || 1,
           superGrosThreshold: Number(superGrosThreshold) || 10,
           description: description.trim() || undefined,
-          imageUrl: activeColors[0]?.imageUrl || undefined,
-          colors: activeColors.map((c) => ({ colorName: c.colorName, imageUrl: c.imageUrl })),
+          imageUrl: sanitizedColors[0]?.imageUrl || undefined,
+          colors: sanitizedColors.map((c) => ({ colorName: c.colorName, imageUrl: c.imageUrl || undefined })),
           sizes: generatedSizesList,
           variants: generatedVariants,
         };
