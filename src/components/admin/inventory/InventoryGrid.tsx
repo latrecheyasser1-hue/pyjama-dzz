@@ -263,15 +263,9 @@ export default function InventoryGrid({
   // Level 1 vs Level 2 state
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null);
 
-  // Helper: Check if product has active stock > 0 in current warehouse context
+  // Helper: Master products exist globally across all 3 active warehouse contexts
   const hasStockInActiveWarehouse = (p: Product): boolean => {
-    if (!p.variants || p.variants.length === 0) return true;
-    return p.variants.some((v) => {
-      if (activeStockTab === 'DELIVERY') return (v.deliveryStock || 0) > 0;
-      if (activeStockTab === 'STORE') return (v.storeStock || 0) > 0;
-      if (activeStockTab === 'WHOLESALE') return (v.wholesaleStock || 0) > 0;
-      return true;
-    });
+    return true;
   };
 
   // Group categories dynamically from DB categories AND active warehouse products
@@ -572,11 +566,17 @@ export default function InventoryGrid({
                           {/* Context Price Display */}
                           <div className="pt-1 flex items-center gap-2 flex-wrap">
                             {activeStockTab === 'WHOLESALE' ? (
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-black text-purple-900 font-mono">
-                                  {product.wholesalePrice || 0} د.ج
-                                </span>
-                                {product.superGrosPrice && (
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {product.wholesalePrice && Number(product.wholesalePrice) > 0 ? (
+                                  <span className="text-sm font-black text-purple-900 font-mono">
+                                    {product.wholesalePrice} د.ج
+                                  </span>
+                                ) : (
+                                  <span className="text-[11px] font-bold text-purple-700 font-mono bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
+                                    سعر الجملة غير محدد
+                                  </span>
+                                )}
+                                {product.superGrosPrice && Number(product.superGrosPrice) > 0 && (
                                   <span className="text-[11px] font-bold text-purple-700 font-mono bg-purple-50 px-2 py-0.5 rounded-md border border-purple-200">
                                     سوبر: {product.superGrosPrice} د.ج
                                   </span>
@@ -584,10 +584,16 @@ export default function InventoryGrid({
                               </div>
                             ) : (
                               <div className="flex items-center gap-2 flex-wrap">
-                                <span className="text-sm font-black text-[#8A2B43] font-mono">
-                                  {product.sellingPrice || 0} د.ج
-                                </span>
-                                {product.oldPrice && (
+                                {product.sellingPrice && Number(product.sellingPrice) > 0 ? (
+                                  <span className="text-sm font-black text-[#8A2B43] font-mono">
+                                    {product.sellingPrice} د.ج
+                                  </span>
+                                ) : (
+                                  <span className="text-[11px] font-bold text-gray-500 font-mono bg-gray-100 px-2 py-0.5 rounded-md border border-gray-200">
+                                    السعر غير محدد
+                                  </span>
+                                )}
+                                {product.oldPrice && Number(product.oldPrice) > 0 && (
                                   <span className="text-xs text-gray-400 line-through font-mono">
                                     {product.oldPrice} د.ج
                                   </span>
