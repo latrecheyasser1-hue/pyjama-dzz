@@ -1,5 +1,7 @@
 // Master Admin ERP Types for Pyjama Design (بيجاما ديزاين)
 
+export * from './product';
+
 export type CustomerScoreTag = 'BON_CLIENT' | 'MAUVAIS_CLIENT' | 'NORMAL';
 
 export type StockType = 'DELIVERY' | 'STORE' | 'WHOLESALE';
