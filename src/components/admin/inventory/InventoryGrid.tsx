@@ -584,21 +584,33 @@ export default function InventoryGrid({
                               </div>
                             ) : (
                               <div className="flex items-center gap-2 flex-wrap">
-                                {product.sellingPrice && Number(product.sellingPrice) > 0 ? (
-                                  <span className="text-sm font-black text-[#8A2B43] font-mono">
-                                    {product.sellingPrice} د.ج
-                                  </span>
+                                {activeStockTab === 'STORE' ? (
+                                  (product.storePrice || (product as any).store_price) && Number(product.storePrice || (product as any).store_price) > 0 ? (
+                                    <span className="text-sm font-black text-[#8A2B43] font-mono">
+                                      {product.storePrice || (product as any).store_price} د.ج (محل)
+                                    </span>
+                                  ) : (
+                                    <span className="text-[11px] font-bold text-gray-500 font-mono bg-gray-100 px-2 py-0.5 rounded-md border border-gray-200">
+                                      سعر المحل غير محدد
+                                    </span>
+                                  )
                                 ) : (
-                                  <span className="text-[11px] font-bold text-gray-500 font-mono bg-gray-100 px-2 py-0.5 rounded-md border border-gray-200">
-                                    السعر غير محدد
-                                  </span>
+                                  product.sellingPrice && Number(product.sellingPrice) > 0 ? (
+                                    <span className="text-sm font-black text-[#8A2B43] font-mono">
+                                      {product.sellingPrice} د.ج
+                                    </span>
+                                  ) : (
+                                    <span className="text-[11px] font-bold text-gray-500 font-mono bg-gray-100 px-2 py-0.5 rounded-md border border-gray-200">
+                                      السعر غير محدد
+                                    </span>
+                                  )
                                 )}
-                                {product.oldPrice && Number(product.oldPrice) > 0 && (
+                                {product.oldPrice && Number(product.oldPrice) > 0 && activeStockTab === 'DELIVERY' && (
                                   <span className="text-xs text-gray-400 line-through font-mono">
                                     {product.oldPrice} د.ج
                                   </span>
                                 )}
-                                {(product.bulk_price || product.bulkPrice || product.bulkDiscountPrice5) && (
+                                {(product.bulk_price || product.bulkPrice || product.bulkDiscountPrice5) && activeStockTab === 'DELIVERY' && (
                                   <span className="text-[10px] font-bold text-[#8A2B43] font-mono bg-pyjama-pink-soft px-2 py-0.5 rounded-md border border-pyjama-pink/40" title="سعر 5 حبات فما فوق">
                                     5+ حبات: {product.bulk_price || product.bulkPrice || product.bulkDiscountPrice5} د.ج
                                   </span>

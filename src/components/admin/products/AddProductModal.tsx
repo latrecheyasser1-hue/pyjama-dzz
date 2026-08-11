@@ -214,6 +214,7 @@ export default function AddProductModal({
   // Pricing State (DZD) - String/Number flexible state to prevent typing resets
   const [costPrice, setCostPrice] = useState<number | string>('');
   const [sellingPrice, setSellingPrice] = useState<number | string>('');
+  const [storePrice, setStorePrice] = useState<number | string>('');
   const [oldPrice, setOldPrice] = useState<number | string>('');
   const [bulkDiscountPrice5, setBulkDiscountPrice5] = useState<number | string>('');
   const [wholesalePrice, setWholesalePrice] = useState<number | string>('');
@@ -267,6 +268,7 @@ export default function AddProductModal({
     setSku('');
     setCostPrice('');
     setSellingPrice('');
+    setStorePrice('');
     setOldPrice('');
     setBulkDiscountPrice5('');
     setWholesalePrice('');
@@ -388,6 +390,15 @@ export default function AddProductModal({
       setSku(productToEdit.sku || '');
       setCostPrice(productToEdit.costPrice ?? (productToEdit as any).cost_price ?? '');
       setSellingPrice(productToEdit.sellingPrice ?? (productToEdit as any).selling_price ?? '');
+
+      const storePriceVal =
+        (productToEdit as any).store_price ??
+        (productToEdit as any).storePrice ??
+        productToEdit.storePrice ??
+        descMeta.storePrice ??
+        '';
+      setStorePrice(storePriceVal !== null && storePriceVal !== undefined && storePriceVal !== '' ? String(storePriceVal) : '');
+
       setOldPrice(productToEdit.oldPrice ?? (productToEdit as any).old_price ?? '');
 
       // Unified bulk_price hydration from all potential DB aliases & description metadata
@@ -1104,6 +1115,8 @@ export default function AddProductModal({
         images: colorImageMap,
         hexes: colorHexMap,
         sizeCategory: sizeCategory,
+        sellingPrice: sellingPrice !== '' ? Number(sellingPrice) : null,
+        storePrice: storePrice !== '' ? Number(storePrice) : null,
         wholesalePrice: wholesalePrice !== '' ? Number(wholesalePrice) : null,
         superGrosPrice: superGrosPrice !== '' ? Number(superGrosPrice) : null,
         unitsPerSerie: firstColorTotalItemsInSerie,
@@ -1130,6 +1143,7 @@ export default function AddProductModal({
       productPayload.supplier_name = supplierName.trim() || (isEditMode ? ((productToEdit as any)?.supplier_name ?? productToEdit?.supplierName ?? null) : null);
       productPayload.supplier_phone = supplierPhone.trim() || (isEditMode ? ((productToEdit as any)?.supplier_phone ?? productToEdit?.supplierPhone ?? null) : null);
       productPayload.selling_price = sellingPrice !== '' ? Number(sellingPrice) : (isEditMode ? ((productToEdit as any)?.selling_price ?? productToEdit?.sellingPrice ?? 0) : 0);
+      productPayload.store_price = String(storePrice) !== '' && storePrice !== undefined && storePrice !== null ? Number(storePrice) : (isEditMode ? ((productToEdit as any)?.store_price ?? (productToEdit as any)?.storePrice ?? null) : null);
       productPayload.old_price = oldPrice !== '' ? Number(oldPrice) : (isEditMode ? ((productToEdit as any)?.old_price ?? productToEdit?.oldPrice ?? null) : null);
       productPayload.bulk_price = bVal ?? (isEditMode ? ((productToEdit as any)?.bulk_price ?? productToEdit?.bulkPrice ?? null) : null);
       productPayload.bulk_discount_price_5 = bVal ?? (isEditMode ? ((productToEdit as any)?.bulk_discount_price_5 ?? productToEdit?.bulkDiscountPrice5 ?? null) : null);
@@ -1260,6 +1274,8 @@ export default function AddProductModal({
         updatedProdObj.supplierName = supplierName.trim() || (productToEdit as any)?.supplier_name || productToEdit?.supplierName || undefined;
         updatedProdObj.supplierPhone = supplierPhone.trim() || (productToEdit as any)?.supplier_phone || productToEdit?.supplierPhone || undefined;
         updatedProdObj.sellingPrice = sellingPrice !== '' ? Number(sellingPrice) : ((productToEdit as any)?.selling_price ?? productToEdit?.sellingPrice ?? 0);
+        updatedProdObj.storePrice = storePrice !== '' ? Number(storePrice) : ((productToEdit as any)?.store_price ?? (productToEdit as any)?.storePrice ?? null);
+        (updatedProdObj as any).store_price = updatedProdObj.storePrice;
         updatedProdObj.oldPrice = oldPrice !== '' ? Number(oldPrice) : ((productToEdit as any)?.old_price ?? productToEdit?.oldPrice ?? null);
         updatedProdObj.bulkPrice = bVal ?? (productToEdit as any)?.bulk_price ?? productToEdit?.bulkPrice ?? null;
         updatedProdObj.bulk_price = bVal ?? (productToEdit as any)?.bulk_price ?? productToEdit?.bulkPrice ?? null;
@@ -1556,12 +1572,12 @@ export default function AddProductModal({
                 />
               </div>
 
-              {/* RETAIL / STORE PRICES SHOWN ONLY IN DELIVERY & STORE CONTEXTS */}
-              {activeWarehouse !== 'WHOLESALE' && (
+              {/* DELIVERY WAREHOUSE PRICING INPUTS */}
+              {activeWarehouse === 'DELIVERY' && (
                 <>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-1">
-                      {activeWarehouse === 'DELIVERY' ? 'سعر البيع بالتجزئة (Vente DZD)' : 'سعر البيع بمحل الشلف (Vente DZD)'} <span className="text-rose-500">*</span>
+                      سعر البيع للتوصيل (Prix Vente Delivery DZD) <span className="text-rose-500">*</span>
                     </label>
                     <input
                       type="number"
@@ -1600,6 +1616,22 @@ export default function AddProductModal({
                     />
                   </div>
                 </>
+              )}
+
+              {/* STORE WAREHOUSE PRICING INPUTS */}
+              {activeWarehouse === 'STORE' && (
+                <div>
+                  <label className="block text-xs font-bold text-gray-700 mb-1">
+                    سعر البيع بمحل الشلف (Prix Vente Magasin DZD) <span className="text-rose-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={storePrice}
+                    onChange={(e) => setStorePrice(e.target.value)}
+                    placeholder=""
+                    className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold text-[#8A2B43] focus:outline-none focus:border-[#8A2B43] shadow-sm"
+                  />
+                </div>
               )}
 
               {/* WHOLESALE & SUPER GROS PRICES SHOWN ONLY IN WHOLESALE WAREHOUSE CONTEXT */}
