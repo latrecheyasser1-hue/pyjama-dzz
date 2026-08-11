@@ -1012,12 +1012,12 @@ export default function AddProductModal({
       return;
     }
 
-    if (activeWarehouse !== 'WHOLESALE' && (!sellingPrice || Number(sellingPrice) <= 0)) {
+    if (!isEditMode && activeWarehouse !== 'WHOLESALE' && (!sellingPrice || Number(sellingPrice) <= 0)) {
       alert('الرجاء إدخال سعر البيع الحالي بشكل صحيح');
       return;
     }
 
-    if (activeWarehouse === 'WHOLESALE' && (!wholesalePrice || Number(wholesalePrice) <= 0)) {
+    if (!isEditMode && activeWarehouse === 'WHOLESALE' && (!wholesalePrice || Number(wholesalePrice) <= 0)) {
       alert('الرجاء إدخال سعر البيع بالجملة بشكل صحيح');
       return;
     }
@@ -1519,7 +1519,6 @@ export default function AddProductModal({
                       onChange={(e) => setSellingPrice(e.target.value)}
                       placeholder=""
                       className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold text-[#8A2B43] focus:outline-none focus:border-[#8A2B43] shadow-sm"
-                      required
                     />
                   </div>
 
@@ -1566,7 +1565,6 @@ export default function AddProductModal({
                       onChange={(e) => setWholesalePrice(e.target.value)}
                       placeholder=""
                       className="w-full px-4 py-3 bg-white rounded-xl border border-purple-200 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-purple-800 shadow-sm"
-                      required
                     />
                   </div>
 
