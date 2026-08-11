@@ -389,8 +389,6 @@ export default function MasterAdminPage() {
           supplierPhone: p.supplier_phone || undefined,
           costPrice: Number(p.cost_price) || 0,
           sellingPrice: Number(p.selling_price) || 0,
-          storePrice: p.store_price !== null && p.store_price !== undefined ? Number(p.store_price) : (descMeta.storePrice !== null && descMeta.storePrice !== undefined ? Number(descMeta.storePrice) : undefined),
-          store_price: p.store_price !== null && p.store_price !== undefined ? Number(p.store_price) : (descMeta.storePrice !== null && descMeta.storePrice !== undefined ? Number(descMeta.storePrice) : undefined),
           oldPrice: p.old_price ? Number(p.old_price) : undefined,
           bulkPrice: p.bulk_price !== null && p.bulk_price !== undefined ? Number(p.bulk_price) : (p.bulk_discount_price_5 !== null && p.bulk_discount_price_5 !== undefined ? Number(p.bulk_discount_price_5) : (descMeta.bulkPrice ?? undefined)),
           bulk_price: p.bulk_price !== null && p.bulk_price !== undefined ? Number(p.bulk_price) : (p.bulk_discount_price_5 !== null && p.bulk_discount_price_5 !== undefined ? Number(p.bulk_discount_price_5) : (descMeta.bulkPrice ?? undefined)),
