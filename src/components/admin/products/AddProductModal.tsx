@@ -1100,6 +1100,33 @@ export default function AddProductModal({
         }
       });
 
+      let existingDescMeta: any = {};
+      if (productToEdit?.description) {
+        const match = productToEdit.description.match(/<!--COLOR_METADATA:([\s\S]*?)-->/);
+        if (match && match[1]) {
+          try { existingDescMeta = JSON.parse(match[1]) || {}; } catch (e) {}
+        }
+      }
+      const existingWarehousesMeta = existingDescMeta.warehouses || {};
+
+      const currentWarehouseData: Record<string, any> = {};
+      if (activeWarehouse === 'WHOLESALE') {
+        currentWarehouseData.wholesalePrice = wholesalePrice !== '' ? Number(wholesalePrice) : null;
+        currentWarehouseData.superGrosPrice = superGrosPrice !== '' ? Number(superGrosPrice) : null;
+        currentWarehouseData.unitsPerSerie = firstColorTotalItemsInSerie;
+        currentWarehouseData.minWholesaleSeries = Number(minWholesaleSeries) || 1;
+        currentWarehouseData.superGrosThreshold = Number(superGrosThreshold) || 10;
+        currentWarehouseData.serieComposition = sanitizedColors[0]?.serieComposition || null;
+        currentWarehouseData.serieCompositions = serieCompositionsMap;
+      } else if (activeWarehouse === 'DELIVERY') {
+        currentWarehouseData.sellingPrice = sellingPrice !== '' ? Number(sellingPrice) : null;
+        currentWarehouseData.oldPrice = oldPrice !== '' ? Number(oldPrice) : null;
+        currentWarehouseData.bulkPrice = bulkDiscountPrice5 !== '' ? Number(bulkDiscountPrice5) : null;
+      } else if (activeWarehouse === 'STORE') {
+        currentWarehouseData.sellingPrice = sellingPrice !== '' ? Number(sellingPrice) : null;
+        currentWarehouseData.oldPrice = oldPrice !== '' ? Number(oldPrice) : null;
+      }
+
       const metaPayload = {
         images: colorImageMap,
         hexes: colorHexMap,
@@ -1111,6 +1138,10 @@ export default function AddProductModal({
         superGrosThreshold: Number(superGrosThreshold) || 10,
         serieComposition: sanitizedColors[0]?.serieComposition || null,
         serieCompositions: serieCompositionsMap,
+        warehouses: {
+          ...existingWarehousesMeta,
+          [activeWarehouse]: currentWarehouseData,
+        },
       };
       if (Object.keys(colorImageMap).length > 0 || Object.keys(colorHexMap).length > 0 || sizeCategory || wholesalePrice !== '') {
         finalDesc = `${finalDesc}\n<!--COLOR_METADATA:${JSON.stringify(metaPayload)}-->`.trim();
