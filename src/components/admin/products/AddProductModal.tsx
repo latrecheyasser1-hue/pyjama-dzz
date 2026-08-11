@@ -437,13 +437,23 @@ export default function AddProductModal({
           detectedCat = 'CLOTHING';
         }
       }
-      setSizeCategory(detectedCat);
+      const activeMeta = descMeta.warehouses?.[activeWarehouse] || {};
+      const sizeConfig = activeMeta.sizeConfig || {};
+
+      const targetCat: SizeCategoryKey = (sizeConfig.sizeCategory || descMeta.sizeCategory || detectedCat || 'CLOTHING') as SizeCategoryKey;
+      setSizeCategory(targetCat);
 
       const allSizesInProduct = Array.from(
         new Set(productToEdit.variants?.map((v) => v.size) || [])
       );
-      if (allSizesInProduct.length > 0) {
-        const catSizes = SIZE_CATEGORIES[detectedCat].sizes;
+
+      setIsStandardSize(sizeConfig.isStandardSize ?? (targetCat === 'CLOTHING' && allSizesInProduct.length === 1 && allSizesInProduct[0] === 'Standard'));
+
+      if (sizeConfig.minSize && sizeConfig.maxSize) {
+        setMinSize(sizeConfig.minSize);
+        setMaxSize(sizeConfig.maxSize);
+      } else if (allSizesInProduct.length > 0) {
+        const catSizes = SIZE_CATEGORIES[targetCat]?.sizes || SIZE_CATEGORIES.CLOTHING.sizes;
         const validIndices = allSizesInProduct
           .map((s) => catSizes.indexOf(s))
           .filter((i) => i !== -1)
@@ -1177,7 +1187,15 @@ export default function AddProductModal({
       }
       const existingWarehousesMeta = existingDescMeta.warehouses || {};
 
-      const currentWarehouseData: Record<string, any> = {};
+      const currentWarehouseData: Record<string, any> = {
+        sizeConfig: {
+          sizeCategory,
+          isStandardSize,
+          minSize,
+          maxSize,
+          generatedSizes: generatedSizesList,
+        },
+      };
       if (activeWarehouse === 'WHOLESALE') {
         currentWarehouseData.wholesalePrice = wholesalePrice !== '' ? Number(wholesalePrice) : null;
         currentWarehouseData.superGrosPrice = superGrosPrice !== '' ? Number(superGrosPrice) : null;
