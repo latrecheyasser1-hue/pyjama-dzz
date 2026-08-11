@@ -925,6 +925,8 @@ export default function AddProductModal({
       typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
     const cleanPayload: Record<string, any> = { ...payload };
+    delete cleanPayload.size_category; // size_category is stored in description metadata
+
     if (cleanPayload.category_id && !isValidUuid(cleanPayload.category_id)) {
       cleanPayload.category_id = null;
     }
@@ -941,7 +943,7 @@ export default function AddProductModal({
         return { data: data[0], error: null };
       }
 
-      // 2. Direct Update without select if select single is blocked
+      // 2. Direct Update without select if select return is empty
       let { error: directUpdateErr } = await supabase
         .from('products')
         .update(cleanPayload)
@@ -951,20 +953,8 @@ export default function AddProductModal({
         return { data: { id: targetProductId, ...cleanPayload }, error: null };
       }
 
-      // 3. Fallback for schema mismatch: remove size_category ONLY (never remove price columns!)
-      const payloadNoSizeCat = { ...cleanPayload };
-      delete payloadNoSizeCat.size_category;
-
-      let { error: errRetry } = await supabase
-        .from('products')
-        .update(payloadNoSizeCat)
-        .eq('id', targetProductId);
-
-      if (!errRetry) {
-        return { data: { id: targetProductId, ...payloadNoSizeCat }, error: null };
-      }
-
-      return { data: null, error: error || directUpdateErr || errRetry };
+      console.error('Update Error Detail:', directUpdateErr || error);
+      return { data: null, error: directUpdateErr || error };
     }
 
     // Insert mode for NEW product
@@ -977,20 +967,16 @@ export default function AddProductModal({
       return { data: data[0], error: null };
     }
 
-    // Fallback insert without size_category
-    const payloadNoSizeCat = { ...cleanPayload };
-    delete payloadNoSizeCat.size_category;
-
-    let retryInsert = await supabase
+    let { error: directInsertErr } = await supabase
       .from('products')
-      .insert([payloadNoSizeCat])
-      .select();
+      .insert([cleanPayload]);
 
-    if (!retryInsert.error && retryInsert.data && retryInsert.data.length > 0) {
-      return { data: retryInsert.data[0], error: null };
+    if (!directInsertErr) {
+      return { data: cleanPayload, error: null };
     }
 
-    return { data: null, error: error || retryInsert.error };
+    console.error('Insert Error Detail:', directInsertErr || error);
+    return { data: null, error: directInsertErr || error };
   };
 
   // Context-Isolated Supabase Submit Handler with Zero-Stock Defaults for Inactive Warehouses
@@ -1062,8 +1048,8 @@ export default function AddProductModal({
         .replace(/<!--COLOR_METADATA:[\s\S]*?-->/g, '')
         .trim();
 
-      const metaPayload = { images: colorImageMap, hexes: colorHexMap };
-      if (Object.keys(colorImageMap).length > 0 || Object.keys(colorHexMap).length > 0) {
+      const metaPayload = { images: colorImageMap, hexes: colorHexMap, sizeCategory: sizeCategory };
+      if (Object.keys(colorImageMap).length > 0 || Object.keys(colorHexMap).length > 0 || sizeCategory) {
         finalDesc = `${finalDesc}\n<!--COLOR_METADATA:${JSON.stringify(metaPayload)}-->`.trim();
       }
 
@@ -1074,7 +1060,6 @@ export default function AddProductModal({
         cost_price: Number(costPrice) || 0,
         description: finalDesc || null,
         image_url: primaryProductImg,
-        size_category: sizeCategory,
       };
 
       const bVal = bulkDiscountPrice5 !== '' && !isNaN(Number(bulkDiscountPrice5)) ? Number(bulkDiscountPrice5) : null;
