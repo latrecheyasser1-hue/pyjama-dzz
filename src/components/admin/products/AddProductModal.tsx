@@ -1144,40 +1144,56 @@ export default function AddProductModal({
       const generatedVariants: ProductVariant[] = [];
 
       sanitizedColors.forEach((c) => {
-        c.activeSizes.forEach((s) => {
+        const colNameTrim = c.colorName.trim();
+        const existingSizesForColor = isEditMode
+          ? existingDbVariants
+              .filter((ev) => (ev.color_name || ev.color) === colNameTrim)
+              .map((ev) => ev.size || ev.size_name)
+              .filter(Boolean)
+          : [];
+
+        const allSizesForColor = Array.from(new Set([...c.activeSizes, ...existingSizesForColor]));
+
+        allSizesForColor.forEach((s) => {
           const existingV = existingDbVariants.find(
             (ev) =>
-              (ev.color_name === c.colorName.trim() || ev.color === c.colorName.trim()) &&
-              (ev.size === s || ev.size_name === s)
+              ((ev.color_name || ev.color) === colNameTrim) &&
+              ((ev.size || ev.size_name) === s)
           );
 
-          // Default Zero-Stock values for new products across all 3 warehouses
-          let finalDel = 0;
-          let finalStore = 0;
-          let finalWs = 0;
+          let finalDel = existingV ? Number(existingV.delivery_stock) || 0 : 0;
+          let finalStore = existingV ? Number(existingV.store_stock) || 0 : 0;
+          let finalWs = existingV ? Number(existingV.wholesale_stock) || 0 : 0;
+          let finalSerieComp = existingV ? (existingV.serie_composition || (existingV as any).serieComposition) : undefined;
 
-          if (isEditMode && existingV) {
-            finalDel = Number(existingV.delivery_stock) || 0;
-            finalStore = Number(existingV.store_stock) || 0;
-            finalWs = Number(existingV.wholesale_stock) || 0;
-          }
-
-          // Active Warehouse input assignment
           if (activeWarehouse === 'DELIVERY') {
-            finalDel = c.deliveryStocks[s] !== undefined ? c.deliveryStocks[s] : 10;
+            if (c.activeSizes.includes(s)) {
+              finalDel = c.deliveryStocks[s] !== undefined ? c.deliveryStocks[s] : (isEditMode && existingV ? finalDel : 10);
+            } else {
+              finalDel = 0;
+            }
           } else if (activeWarehouse === 'STORE') {
-            finalStore = c.storeStocks[s] !== undefined ? c.storeStocks[s] : 5;
+            if (c.activeSizes.includes(s)) {
+              finalStore = c.storeStocks[s] !== undefined ? c.storeStocks[s] : (isEditMode && existingV ? finalStore : 5);
+            } else {
+              finalStore = 0;
+            }
           } else if (activeWarehouse === 'WHOLESALE') {
-            finalWs = 0;
+            if (c.activeSizes.includes(s)) {
+              finalWs = 0;
+              finalSerieComp = c.serieComposition;
+            } else {
+              finalWs = 0;
+            }
           }
 
           const colImg = c.imageUrl || undefined;
           const colHex = c.colorHex || '#ffffff';
           generatedVariants.push({
-            id: existingV ? String(existingV.id) : `v-${Date.now()}-${c.colorName}-${s}`,
+            id: existingV ? String(existingV.id) : `v-${Date.now()}-${colNameTrim}-${s}`,
             productId: isEditMode && productToEdit ? productToEdit.id : '',
             size: s,
-            color: c.colorName.trim(),
+            color: colNameTrim,
             color_hex: colHex,
             colorHex: colHex,
             color_image_url: colImg,
@@ -1185,7 +1201,7 @@ export default function AddProductModal({
             deliveryStock: finalDel,
             storeStock: finalStore,
             wholesaleStock: finalWs,
-            serieComposition: c.serieComposition,
+            serieComposition: finalSerieComp || c.serieComposition,
           });
         });
       });
