@@ -588,7 +588,7 @@ export default function AddProductModal({
     } else {
       resetForm();
     }
-  }, [isOpen, productToEditId, activeWarehouse]);
+  }, [isOpen, productToEditId, activeWarehouse || 'DELIVERY']);
 
   // Handle Supplier Selection
   const handleSupplierChange = (supId: string) => {
