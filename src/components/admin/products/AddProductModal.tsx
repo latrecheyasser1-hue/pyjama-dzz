@@ -915,115 +915,82 @@ export default function AddProductModal({
     return false;
   };
 
-  // Ultra-Resilient Product Insert/Update Helper with Multi-Stage Fallbacks for Column Differences
+  // Ultra-Resilient Product Insert/Update Helper preserving 100% of price fields
   const insertOrUpdateProductWithResilience = async (
     payload: Record<string, any>,
     targetProductId?: string
   ): Promise<{ data: any; error: any }> => {
-    // Attempt 1: Full payload with select
-    let result: { data: any; error: any } = targetProductId
-      ? await supabase.from('products').update(payload).eq('id', targetProductId).select().single()
-      : await supabase.from('products').insert([payload]).select().single();
+    // Sanitize category_id to ensure it is a valid UUID string or null
+    const isValidUuid = (id: any) =>
+      typeof id === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id);
 
-    if (!result.error && result.data) return result;
+    const cleanPayload: Record<string, any> = { ...payload };
+    if (cleanPayload.category_id && !isValidUuid(cleanPayload.category_id)) {
+      cleanPayload.category_id = null;
+    }
 
-    // Attempt 1b: Full payload without .single() if select single fails
-    if (result.error) {
-      let retryNoSingle = targetProductId
-        ? await supabase.from('products').update(payload).eq('id', targetProductId).select()
-        : await supabase.from('products').insert([payload]).select();
+    if (targetProductId) {
+      // 1. Primary Update Attempt with select
+      let { data, error } = await supabase
+        .from('products')
+        .update(cleanPayload)
+        .eq('id', targetProductId)
+        .select();
 
-      if (!retryNoSingle.error && retryNoSingle.data && retryNoSingle.data.length > 0) {
-        return { data: retryNoSingle.data[0], error: null };
+      if (!error && data && data.length > 0) {
+        return { data: data[0], error: null };
       }
-    }
 
-    // Fallback 1: Duplicate SKU Key Constraint Violation
-    const errMsg = result.error?.message || result.error?.details || JSON.stringify(result.error || {});
-    if (errMsg.includes('products_sku_key') || errMsg.includes('duplicate key value')) {
-      console.warn('Duplicate SKU detected. Generating unique SKU suffix and retrying...');
-      const payloadNewSku = {
-        ...payload,
-        sku: `${payload.sku || 'PYJ'}-${Date.now().toString().slice(-4)}${Math.floor(100 + Math.random() * 900)}`,
-      };
+      // 2. Direct Update without select if select single is blocked
+      let { error: directUpdateErr } = await supabase
+        .from('products')
+        .update(cleanPayload)
+        .eq('id', targetProductId);
 
-      result = targetProductId
-        ? await supabase.from('products').update(payloadNewSku).eq('id', targetProductId).select().single()
-        : await supabase.from('products').insert([payloadNewSku]).select().single();
+      if (!directUpdateErr) {
+        return { data: { id: targetProductId, ...cleanPayload }, error: null };
+      }
 
-      if (!result.error && result.data) return result;
-    }
-
-    // Fallback 2: Remove size_category if column doesn't exist in DB schema
-    if (result.error && 'size_category' in payload) {
-      console.warn('Retrying insert/update without size_category column...');
-      const payloadNoSizeCat = { ...payload };
+      // 3. Fallback for schema mismatch: remove size_category ONLY (never remove price columns!)
+      const payloadNoSizeCat = { ...cleanPayload };
       delete payloadNoSizeCat.size_category;
 
-      result = targetProductId
-        ? await supabase.from('products').update(payloadNoSizeCat).eq('id', targetProductId).select().single()
-        : await supabase.from('products').insert([payloadNoSizeCat]).select().single();
+      let { error: errRetry } = await supabase
+        .from('products')
+        .update(payloadNoSizeCat)
+        .eq('id', targetProductId);
 
-      if (!result.error && result.data) return result;
+      if (!errRetry) {
+        return { data: { id: targetProductId, ...payloadNoSizeCat }, error: null };
+      }
+
+      return { data: null, error: error || directUpdateErr || errRetry };
     }
 
-    // Fallback 3: Try bulk_price only vs bulk_discount_price_5 only
-    if (result.error && ('bulk_price' in payload || 'bulk_discount_price_5' in payload)) {
-      console.warn('Retrying insert/update with bulk_price only...');
-      const payloadBulkPriceOnly = { ...payload };
-      delete payloadBulkPriceOnly.bulk_discount_price_5;
+    // Insert mode for NEW product
+    let { data, error } = await supabase
+      .from('products')
+      .insert([cleanPayload])
+      .select();
 
-      result = targetProductId
-        ? await supabase.from('products').update(payloadBulkPriceOnly).eq('id', targetProductId).select().single()
-        : await supabase.from('products').insert([payloadBulkPriceOnly]).select().single();
-
-      if (!result.error && result.data) return result;
-
-      console.warn('Retrying insert/update with bulk_discount_price_5 only...');
-      const payloadBulkDiscountOnly = { ...payload };
-      delete payloadBulkDiscountOnly.bulk_price;
-
-      result = targetProductId
-        ? await supabase.from('products').update(payloadBulkDiscountOnly).eq('id', targetProductId).select().single()
-        : await supabase.from('products').insert([payloadBulkDiscountOnly]).select().single();
-
-      if (!result.error && result.data) return result;
+    if (!error && data && data.length > 0) {
+      return { data: data[0], error: null };
     }
 
-    // Fallback 4: Remove optional schema columns
-    if (result.error) {
-      console.warn('Retrying insert/update without optional schema columns...');
-      const payloadNoOptional = { ...payload };
-      delete payloadNoOptional.bulk_price;
-      delete payloadNoOptional.bulk_discount_price_5;
-      delete payloadNoOptional.size_category;
+    // Fallback insert without size_category
+    const payloadNoSizeCat = { ...cleanPayload };
+    delete payloadNoSizeCat.size_category;
 
-      result = targetProductId
-        ? await supabase.from('products').update(payloadNoOptional).eq('id', targetProductId).select().single()
-        : await supabase.from('products').insert([payloadNoOptional]).select().single();
+    let retryInsert = await supabase
+      .from('products')
+      .insert([payloadNoSizeCat])
+      .select();
 
-      if (!result.error && result.data) return result;
+    if (!retryInsert.error && retryInsert.data && retryInsert.data.length > 0) {
+      return { data: retryInsert.data[0], error: null };
     }
 
-    // Fallback 5: Essential core fields ONLY
-    if (result.error) {
-      console.warn('Retrying with standard core fields...');
-      const corePayload: Record<string, any> = {
-        name: payload.name,
-        sku: payload.sku,
-        category_id: payload.category_id || null,
-        cost_price: payload.cost_price || 0,
-        selling_price: payload.selling_price || 0,
-        description: payload.description || null,
-        image_url: payload.image_url || null,
-      };
-
-      result = targetProductId
-        ? await supabase.from('products').update(corePayload).eq('id', targetProductId).select().single()
-        : await supabase.from('products').insert([corePayload]).select().single();
-    }
-
-    return result;
+    return { data: null, error: error || retryInsert.error };
   };
 
   // Context-Isolated Supabase Submit Handler with Zero-Stock Defaults for Inactive Warehouses
