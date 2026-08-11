@@ -1313,7 +1313,17 @@ export default function AddProductModal({
           let finalDel = existingV ? Number(existingV.delivery_stock) || 0 : 0;
           let finalStore = existingV ? Number(existingV.store_stock) || 0 : 0;
           let finalWs = existingV ? Number(existingV.wholesale_stock) || 0 : 0;
-          let finalSerieComp = existingV ? (existingV.serie_composition || (existingV as any).serieComposition) : undefined;
+          let cleanSerieComp: Record<string, number> | undefined = undefined;
+          const rawComp = (activeWarehouse === 'WHOLESALE' ? c.serieComposition : undefined) || (existingV ? (existingV.serie_composition || (existingV as any).serieComposition) : undefined);
+          if (rawComp && typeof rawComp === 'object') {
+            const temp: Record<string, number> = {};
+            Object.entries(rawComp).forEach(([sz, qty]) => {
+              if (generatedSizesList.includes(sz)) {
+                temp[sz] = Number(qty) || 0;
+              }
+            });
+            if (Object.keys(temp).length > 0) cleanSerieComp = temp;
+          }
 
           if (delActiveList.includes(s)) {
             if (activeWarehouse === 'DELIVERY') {
@@ -1334,7 +1344,6 @@ export default function AddProductModal({
           if (wsActiveList.includes(s)) {
             if (activeWarehouse === 'WHOLESALE') {
               finalWs = c.wholesaleStocks[s] !== undefined ? c.wholesaleStocks[s] : (isEditMode && existingV ? finalWs : 0);
-              finalSerieComp = c.serieComposition;
             }
           } else {
             finalWs = 0;
@@ -1354,7 +1363,7 @@ export default function AddProductModal({
             deliveryStock: finalDel,
             storeStock: finalStore,
             wholesaleStock: finalWs,
-            serieComposition: finalSerieComp || c.serieComposition,
+            serieComposition: cleanSerieComp,
           });
         });
       });

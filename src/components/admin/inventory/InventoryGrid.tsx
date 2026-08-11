@@ -640,13 +640,13 @@ export default function InventoryGrid({
 
                             const getVariantSerieQty = (v: ProductVariant) => {
                               if (v.serieComposition && typeof v.serieComposition === 'object' && v.serieComposition[v.size] !== undefined) {
-                                return Number(v.serieComposition[v.size]) || 2;
+                                return Number(v.serieComposition[v.size]) || 0;
                               }
                               if (product.unitsPerSerie && firstColorVars.length > 0) {
                                 const derived = Math.round(product.unitsPerSerie / firstColorVars.length);
-                                return derived > 0 ? derived : 2;
+                                return derived > 0 ? derived : 1;
                               }
-                              return 2;
+                              return 1;
                             };
 
                             const activeSerieVars = firstColorVars.filter((v) => getVariantSerieQty(v) > 0);
