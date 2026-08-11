@@ -347,74 +347,24 @@ export default function AddProductModal({
     if (!isOpen) return;
 
     if (productToEdit) {
-      setNameAr(productToEdit.nameAr || (productToEdit as any).name || '');
-      setCategoryId(productToEdit.categoryId || (productToEdit as any).category_id || '');
-      setSupplierName(productToEdit.supplierName || (productToEdit as any).supplier_name || '');
-      setSupplierPhone(productToEdit.supplierPhone || (productToEdit as any).supplier_phone || '');
-      setSku(productToEdit.sku || '');
-      setCostPrice(productToEdit.costPrice ?? (productToEdit as any).cost_price ?? '');
-      setSellingPrice(productToEdit.sellingPrice ?? (productToEdit as any).selling_price ?? '');
-      setOldPrice(productToEdit.oldPrice ?? (productToEdit as any).old_price ?? '');
-
-      // Unified bulk_price hydration from all potential DB aliases
-      const bulkPriceVal =
-        (productToEdit as any).bulk_price ??
-        (productToEdit as any).bulkPrice ??
-        productToEdit.bulkDiscountPrice5 ??
-        (productToEdit as any).bulk_discount_price_5 ??
-        '';
-      setBulkDiscountPrice5(bulkPriceVal);
-
-      const wsPriceVal =
-        (productToEdit as any).wholesale_price ??
-        (productToEdit as any).wholesalePrice ??
-        productToEdit.wholesalePrice ??
-        '';
-      setWholesalePrice(wsPriceVal !== null && wsPriceVal !== undefined ? String(wsPriceVal) : '');
-
-      const superGrosVal =
-        (productToEdit as any).super_gros_price ??
-        (productToEdit as any).superGrosPrice ??
-        productToEdit.superGrosPrice ??
-        '';
-      setSuperGrosPrice(superGrosVal !== null && superGrosVal !== undefined ? String(superGrosVal) : '');
-
-      const minSeriesVal =
-        (productToEdit as any).min_wholesale_series ??
-        (productToEdit as any).minWholesaleSeries ??
-        productToEdit.minWholesaleSeries ??
-        1;
-      setMinWholesaleSeries(minSeriesVal);
-
-      const superGrosThreshVal =
-        (productToEdit as any).super_gros_threshold ??
-        (productToEdit as any).superGrosThreshold ??
-        productToEdit.superGrosThreshold ??
-        10;
-      setSuperGrosThreshold(superGrosThreshVal);
-      const rawDesc = productToEdit.description || '';
-      const cleanDisplayDesc = rawDesc
-        .replace(/<!--COLOR_IMAGES:[\s\S]*?-->/g, '')
-        .replace(/<!--COLOR_METADATA:[\s\S]*?-->/g, '')
-        .trim();
-      setDescription(cleanDisplayDesc);
-
-      // Extract color metadata maps from description if present
       let descColorMap: Record<string, string> = {};
       let descHexMap: Record<string, string> = {};
+      let descMeta: any = {};
 
-      if (productToEdit.description) {
-        const metaMatch = productToEdit.description.match(/<!--COLOR_METADATA:([\s\S]*?)-->/);
+      const rawDesc = productToEdit.description || '';
+      if (rawDesc) {
+        const metaMatch = rawDesc.match(/<!--COLOR_METADATA:([\s\S]*?)-->/);
         if (metaMatch && metaMatch[1]) {
           try {
             const parsed = JSON.parse(metaMatch[1]);
+            descMeta = parsed || {};
             if (parsed.images) descColorMap = parsed.images;
             if (parsed.hexes) descHexMap = parsed.hexes;
           } catch (e) {
             console.warn('Notice parsing descMetadata:', e);
           }
         } else {
-          const match = productToEdit.description.match(/<!--COLOR_IMAGES:([\s\S]*?)-->/);
+          const match = rawDesc.match(/<!--COLOR_IMAGES:[\s\S]*?-->/);
           if (match && match[1]) {
             try {
               descColorMap = JSON.parse(match[1]);
@@ -424,6 +374,63 @@ export default function AddProductModal({
           }
         }
       }
+
+      const cleanDisplayDesc = rawDesc
+        .replace(/<!--COLOR_IMAGES:[\s\S]*?-->/g, '')
+        .replace(/<!--COLOR_METADATA:[\s\S]*?-->/g, '')
+        .trim();
+      setDescription(cleanDisplayDesc);
+
+      setNameAr(productToEdit.nameAr || (productToEdit as any).name || '');
+      setCategoryId(productToEdit.categoryId || (productToEdit as any).category_id || '');
+      setSupplierName(productToEdit.supplierName || (productToEdit as any).supplier_name || '');
+      setSupplierPhone(productToEdit.supplierPhone || (productToEdit as any).supplier_phone || '');
+      setSku(productToEdit.sku || '');
+      setCostPrice(productToEdit.costPrice ?? (productToEdit as any).cost_price ?? '');
+      setSellingPrice(productToEdit.sellingPrice ?? (productToEdit as any).selling_price ?? '');
+      setOldPrice(productToEdit.oldPrice ?? (productToEdit as any).old_price ?? '');
+
+      // Unified bulk_price hydration from all potential DB aliases & description metadata
+      const bulkPriceVal =
+        (productToEdit as any).bulk_price ??
+        (productToEdit as any).bulkPrice ??
+        productToEdit.bulkDiscountPrice5 ??
+        (productToEdit as any).bulk_discount_price_5 ??
+        descMeta.bulkPrice ??
+        '';
+      setBulkDiscountPrice5(bulkPriceVal);
+
+      const wsPriceVal =
+        (productToEdit as any).wholesale_price ??
+        (productToEdit as any).wholesalePrice ??
+        productToEdit.wholesalePrice ??
+        descMeta.wholesalePrice ??
+        '';
+      setWholesalePrice(wsPriceVal !== null && wsPriceVal !== undefined && wsPriceVal !== '' ? String(wsPriceVal) : '');
+
+      const superGrosVal =
+        (productToEdit as any).super_gros_price ??
+        (productToEdit as any).superGrosPrice ??
+        productToEdit.superGrosPrice ??
+        descMeta.superGrosPrice ??
+        '';
+      setSuperGrosPrice(superGrosVal !== null && superGrosVal !== undefined && superGrosVal !== '' ? String(superGrosVal) : '');
+
+      const minSeriesVal =
+        (productToEdit as any).min_wholesale_series ??
+        (productToEdit as any).minWholesaleSeries ??
+        productToEdit.minWholesaleSeries ??
+        descMeta.minWholesaleSeries ??
+        1;
+      setMinWholesaleSeries(minSeriesVal);
+
+      const superGrosThreshVal =
+        (productToEdit as any).super_gros_threshold ??
+        (productToEdit as any).superGrosThreshold ??
+        productToEdit.superGrosThreshold ??
+        descMeta.superGrosThreshold ??
+        10;
+      setSuperGrosThreshold(superGrosThreshVal);
 
       // Infer or load size category accurately from product data
       let detectedCat: SizeCategoryKey =

@@ -306,12 +306,14 @@ export default function MasterAdminPage() {
       const mappedProducts: Product[] = prodData.map((p: any) => {
         let descColorMap: Record<string, string> = {};
         let descHexMap: Record<string, string> = {};
+        let descMeta: any = {};
 
         if (p.description) {
           const metaMatch = p.description.match(/<!--COLOR_METADATA:([\s\S]*?)-->/);
           if (metaMatch && metaMatch[1]) {
             try {
               const parsed = JSON.parse(metaMatch[1]);
+              descMeta = parsed || {};
               if (parsed.images) descColorMap = parsed.images;
               if (parsed.hexes) descHexMap = parsed.hexes;
             } catch (e) {}
@@ -335,7 +337,7 @@ export default function MasterAdminPage() {
                 return {
                   id: String(v.id),
                   productId: String(v.product_id),
-                  size: v.size || v.size_name || 'Standard',
+                  size: v.size || v.size_name || 'M',
                   color: col,
                   color_hex: hex,
                   colorHex: hex,
@@ -388,14 +390,14 @@ export default function MasterAdminPage() {
           costPrice: Number(p.cost_price) || 0,
           sellingPrice: Number(p.selling_price) || 0,
           oldPrice: p.old_price ? Number(p.old_price) : undefined,
-          bulkPrice: p.bulk_price !== null && p.bulk_price !== undefined ? Number(p.bulk_price) : (p.bulk_discount_price_5 !== null && p.bulk_discount_price_5 !== undefined ? Number(p.bulk_discount_price_5) : undefined),
-          bulk_price: p.bulk_price !== null && p.bulk_price !== undefined ? Number(p.bulk_price) : (p.bulk_discount_price_5 !== null && p.bulk_discount_price_5 !== undefined ? Number(p.bulk_discount_price_5) : undefined),
-          bulkDiscountPrice5: p.bulk_price !== null && p.bulk_price !== undefined ? Number(p.bulk_price) : (p.bulk_discount_price_5 !== null && p.bulk_discount_price_5 !== undefined ? Number(p.bulk_discount_price_5) : undefined),
-          wholesalePrice: p.wholesale_price !== null && p.wholesale_price !== undefined ? Number(p.wholesale_price) : undefined,
-          superGrosPrice: p.super_gros_price !== null && p.super_gros_price !== undefined ? Number(p.super_gros_price) : undefined,
-          unitsPerSerie: p.units_per_serie !== null && p.units_per_serie !== undefined ? Number(p.units_per_serie) : (sizes.length || 4),
-          minWholesaleSeries: p.min_wholesale_series !== null && p.min_wholesale_series !== undefined ? Number(p.min_wholesale_series) : 1,
-          superGrosThreshold: p.super_gros_threshold !== null && p.super_gros_threshold !== undefined ? Number(p.super_gros_threshold) : 10,
+          bulkPrice: p.bulk_price !== null && p.bulk_price !== undefined ? Number(p.bulk_price) : (p.bulk_discount_price_5 !== null && p.bulk_discount_price_5 !== undefined ? Number(p.bulk_discount_price_5) : (descMeta.bulkPrice ?? undefined)),
+          bulk_price: p.bulk_price !== null && p.bulk_price !== undefined ? Number(p.bulk_price) : (p.bulk_discount_price_5 !== null && p.bulk_discount_price_5 !== undefined ? Number(p.bulk_discount_price_5) : (descMeta.bulkPrice ?? undefined)),
+          bulkDiscountPrice5: p.bulk_price !== null && p.bulk_price !== undefined ? Number(p.bulk_price) : (p.bulk_discount_price_5 !== null && p.bulk_discount_price_5 !== undefined ? Number(p.bulk_discount_price_5) : (descMeta.bulkPrice ?? undefined)),
+          wholesalePrice: p.wholesale_price !== null && p.wholesale_price !== undefined ? Number(p.wholesale_price) : (descMeta.wholesalePrice !== null && descMeta.wholesalePrice !== undefined ? Number(descMeta.wholesalePrice) : undefined),
+          superGrosPrice: p.super_gros_price !== null && p.super_gros_price !== undefined ? Number(p.super_gros_price) : (descMeta.superGrosPrice !== null && descMeta.superGrosPrice !== undefined ? Number(descMeta.superGrosPrice) : undefined),
+          unitsPerSerie: p.units_per_serie !== null && p.units_per_serie !== undefined ? Number(p.units_per_serie) : (descMeta.unitsPerSerie ?? (sizes.length || 4)),
+          minWholesaleSeries: p.min_wholesale_series !== null && p.min_wholesale_series !== undefined ? Number(p.min_wholesale_series) : (descMeta.minWholesaleSeries ?? 1),
+          superGrosThreshold: p.super_gros_threshold !== null && p.super_gros_threshold !== undefined ? Number(p.super_gros_threshold) : (descMeta.superGrosThreshold ?? 10),
           description: p.description || undefined,
           imageUrl: p.image_url || undefined,
           colors: colors,
