@@ -192,6 +192,9 @@ interface ColorInputItem {
   // Wholesale Serie Composition per Color
   serieComposition: Record<string, number>;
   activeSizes: string[];
+  deliveryActiveSizes: string[];
+  storeActiveSizes: string[];
+  wholesaleActiveSizes: string[];
 }
 
 export default function AddProductModal({
@@ -241,6 +244,9 @@ export default function AddProductModal({
       wholesaleStocks: { S: 0, M: 0, L: 0, XL: 0 },
       serieComposition: { S: 2, M: 2, L: 2, XL: 2 },
       activeSizes: ['S', 'M', 'L', 'XL'],
+      deliveryActiveSizes: ['S', 'M', 'L', 'XL'],
+      storeActiveSizes: ['S', 'M', 'L', 'XL'],
+      wholesaleActiveSizes: ['S', 'M', 'L', 'XL'],
     },
   ]);
 
@@ -288,6 +294,9 @@ export default function AddProductModal({
         wholesaleStocks: { S: 0, M: 0, L: 0, XL: 0 },
         serieComposition: { S: 2, M: 2, L: 2, XL: 2 },
         activeSizes: ['S', 'M', 'L', 'XL'],
+        deliveryActiveSizes: ['S', 'M', 'L', 'XL'],
+        storeActiveSizes: ['S', 'M', 'L', 'XL'],
+        wholesaleActiveSizes: ['S', 'M', 'L', 'XL'],
       },
     ]);
     setDescription('');
@@ -385,54 +394,34 @@ export default function AddProductModal({
       setCategoryId(productToEdit.categoryId || (productToEdit as any).category_id || '');
       setSupplierName(productToEdit.supplierName || (productToEdit as any).supplier_name || '');
       setSupplierPhone(productToEdit.supplierPhone || (productToEdit as any).supplier_phone || '');
-      const isStoreContext = activeWarehouse === 'STORE';
-      const priceVal = isStoreContext
-        ? ((productToEdit as any).store_price ?? (productToEdit as any).storePrice ?? productToEdit.storePrice ?? descMeta.warehouses?.STORE?.sellingPrice ?? descMeta.storePrice ?? productToEdit.sellingPrice)
-        : (productToEdit.sellingPrice ?? (productToEdit as any).selling_price ?? descMeta.warehouses?.DELIVERY?.sellingPrice ?? '');
-      setSellingPrice(priceVal !== null && priceVal !== undefined && priceVal !== '' ? String(priceVal) : '');
-      setOldPrice(productToEdit.oldPrice ?? (productToEdit as any).old_price ?? '');
+      const delMeta = descMeta.warehouses?.DELIVERY || {};
+      const storeMeta = descMeta.warehouses?.STORE || {};
+      const wsMeta = descMeta.warehouses?.WHOLESALE || {};
 
-      // Unified bulk_price hydration from all potential DB aliases & description metadata
-      const bulkPriceVal =
-        (productToEdit as any).bulk_price ??
-        (productToEdit as any).bulkPrice ??
-        productToEdit.bulkDiscountPrice5 ??
-        (productToEdit as any).bulk_discount_price_5 ??
-        descMeta.bulkPrice ??
-        '';
-      setBulkDiscountPrice5(bulkPriceVal);
-
-      const wsPriceVal =
-        (productToEdit as any).wholesale_price ??
-        (productToEdit as any).wholesalePrice ??
-        productToEdit.wholesalePrice ??
-        descMeta.wholesalePrice ??
-        '';
-      setWholesalePrice(wsPriceVal !== null && wsPriceVal !== undefined && wsPriceVal !== '' ? String(wsPriceVal) : '');
-
-      const superGrosVal =
-        (productToEdit as any).super_gros_price ??
-        (productToEdit as any).superGrosPrice ??
-        productToEdit.superGrosPrice ??
-        descMeta.superGrosPrice ??
-        '';
-      setSuperGrosPrice(superGrosVal !== null && superGrosVal !== undefined && superGrosVal !== '' ? String(superGrosVal) : '');
-
-      const minSeriesVal =
-        (productToEdit as any).min_wholesale_series ??
-        (productToEdit as any).minWholesaleSeries ??
-        productToEdit.minWholesaleSeries ??
-        descMeta.minWholesaleSeries ??
-        1;
-      setMinWholesaleSeries(minSeriesVal);
-
-      const superGrosThreshVal =
-        (productToEdit as any).super_gros_threshold ??
-        (productToEdit as any).superGrosThreshold ??
-        productToEdit.superGrosThreshold ??
-        descMeta.superGrosThreshold ??
-        10;
-      setSuperGrosThreshold(superGrosThreshVal);
+      if (activeWarehouse === 'DELIVERY') {
+        const pVal = delMeta.sellingPrice ?? productToEdit.sellingPrice ?? (productToEdit as any).selling_price ?? '';
+        setSellingPrice(pVal !== null && pVal !== undefined && pVal !== '' ? String(pVal) : '');
+        const oVal = delMeta.oldPrice ?? productToEdit.oldPrice ?? (productToEdit as any).old_price ?? '';
+        setOldPrice(oVal !== null && oVal !== undefined && oVal !== '' ? String(oVal) : '');
+        const bVal = delMeta.bulkPrice ?? productToEdit.bulkPrice ?? productToEdit.bulkDiscountPrice5 ?? (productToEdit as any).bulk_price ?? descMeta.bulkPrice ?? '';
+        setBulkDiscountPrice5(bVal !== null && bVal !== undefined && bVal !== '' ? String(bVal) : '');
+      } else if (activeWarehouse === 'STORE') {
+        const pVal = storeMeta.storePrice ?? storeMeta.sellingPrice ?? productToEdit.storePrice ?? descMeta.storePrice ?? productToEdit.sellingPrice ?? '';
+        setSellingPrice(pVal !== null && pVal !== undefined && pVal !== '' ? String(pVal) : '');
+        const oVal = storeMeta.storeOldPrice ?? storeMeta.oldPrice ?? productToEdit.storeOldPrice ?? '';
+        setOldPrice(oVal !== null && oVal !== undefined && oVal !== '' ? String(oVal) : '');
+        const bVal = storeMeta.storeBulkPrice ?? storeMeta.bulkPrice ?? productToEdit.storeBulkPrice ?? '';
+        setBulkDiscountPrice5(bVal !== null && bVal !== undefined && bVal !== '' ? String(bVal) : '');
+      } else if (activeWarehouse === 'WHOLESALE') {
+        const wsPriceVal = wsMeta.wholesalePrice ?? (productToEdit as any).wholesale_price ?? productToEdit.wholesalePrice ?? descMeta.wholesalePrice ?? '';
+        setWholesalePrice(wsPriceVal !== null && wsPriceVal !== undefined && wsPriceVal !== '' ? String(wsPriceVal) : '');
+        const superGrosVal = wsMeta.superGrosPrice ?? (productToEdit as any).super_gros_price ?? productToEdit.superGrosPrice ?? descMeta.superGrosPrice ?? '';
+        setSuperGrosPrice(superGrosVal !== null && superGrosVal !== undefined && superGrosVal !== '' ? String(superGrosVal) : '');
+        const minSeriesVal = wsMeta.minWholesaleSeries ?? (productToEdit as any).min_wholesale_series ?? productToEdit.minWholesaleSeries ?? descMeta.minWholesaleSeries ?? 1;
+        setMinWholesaleSeries(minSeriesVal);
+        const superGrosThreshVal = wsMeta.superGrosThreshold ?? (productToEdit as any).super_gros_threshold ?? productToEdit.superGrosThreshold ?? descMeta.superGrosThreshold ?? 10;
+        setSuperGrosThreshold(superGrosThreshVal);
+      }
 
       // Infer or load size category accurately from product data
       let detectedCat: SizeCategoryKey =
@@ -504,10 +493,21 @@ export default function AddProductModal({
 
         const colorItems: ColorInputItem[] = Object.entries(colorGroups).map(([colName, vars], idx) => {
           const activeSizes: string[] = [];
+          const delActiveSizes: string[] = [];
+          const storeActiveSizes: string[] = [];
+          const wsActiveSizes: string[] = [];
           const delStocks: Record<string, number> = {};
           const storeStocks: Record<string, number> = {};
           const wsStocks: Record<string, number> = {};
           const serieComp: Record<string, number> = {};
+
+          const metaDelObj = descMeta.warehouses?.DELIVERY?.activeSizes?.find((x: any) => x.color === colName);
+          const metaStoreObj = descMeta.warehouses?.STORE?.activeSizes?.find((x: any) => x.color === colName);
+          const metaWsObj = descMeta.warehouses?.WHOLESALE?.activeSizes?.find((x: any) => x.color === colName);
+
+          const savedDelSizes: string[] | undefined = metaDelObj?.sizes;
+          const savedStoreSizes: string[] | undefined = metaStoreObj?.sizes;
+          const savedWsSizes: string[] | undefined = metaWsObj?.sizes;
 
           const derivedUnitsPerSize =
             productToEdit.unitsPerSerie && vars.length > 0
@@ -519,10 +519,22 @@ export default function AddProductModal({
               : undefined;
 
           vars.forEach((v) => {
-            if (v.size) activeSizes.push(v.size);
-            delStocks[v.size] = v.deliveryStock;
-            storeStocks[v.size] = v.storeStock;
-            wsStocks[v.size] = v.wholesaleStock;
+            if (v.size) {
+              if (!activeSizes.includes(v.size)) activeSizes.push(v.size);
+              delStocks[v.size] = v.deliveryStock;
+              storeStocks[v.size] = v.storeStock;
+              wsStocks[v.size] = v.wholesaleStock;
+
+              if (savedDelSizes ? savedDelSizes.includes(v.size) : v.deliveryStock > 0) {
+                if (!delActiveSizes.includes(v.size)) delActiveSizes.push(v.size);
+              }
+              if (savedStoreSizes ? savedStoreSizes.includes(v.size) : v.storeStock > 0) {
+                if (!storeActiveSizes.includes(v.size)) storeActiveSizes.push(v.size);
+              }
+              if (savedWsSizes ? savedWsSizes.includes(v.size) : (v.serieComposition?.[v.size] ?? v.wholesaleStock) > 0) {
+                if (!wsActiveSizes.includes(v.size)) wsActiveSizes.push(v.size);
+              }
+            }
 
             let sizePieceCount: number | undefined;
             if (v.serieComposition && typeof v.serieComposition === 'object' && v.serieComposition[v.size] !== undefined) {
@@ -541,6 +553,10 @@ export default function AddProductModal({
               serieComp[v.size] = sizePieceCount;
             }
           });
+
+          if (delActiveSizes.length === 0) delActiveSizes.push(...activeSizes);
+          if (storeActiveSizes.length === 0) storeActiveSizes.push(...activeSizes);
+          if (wsActiveSizes.length === 0) wsActiveSizes.push(...activeSizes);
 
           // Ensure active sizes have an assigned serie piece count without forcing hardcoded default override
           activeSizes.forEach((s) => {
@@ -568,6 +584,13 @@ export default function AddProductModal({
             colorPropObj?.colorHex ||
             '#ffffff';
 
+          const activeSizesForCurrentTab =
+            activeWarehouse === 'DELIVERY'
+              ? delActiveSizes
+              : activeWarehouse === 'STORE'
+              ? storeActiveSizes
+              : wsActiveSizes;
+
           return {
             id: `c-edit-${idx}-${Date.now()}`,
             colorName: colName,
@@ -577,7 +600,10 @@ export default function AddProductModal({
             storeStocks: storeStocks,
             wholesaleStocks: wsStocks,
             serieComposition: Object.keys(serieComp).length > 0 ? serieComp : (descMeta.serieComposition || { S: 2, M: 2, L: 2, XL: 2 }),
-            activeSizes: activeSizes.length > 0 ? activeSizes : ['S', 'M', 'L', 'XL'],
+            activeSizes: activeSizesForCurrentTab.length > 0 ? activeSizesForCurrentTab : ['S', 'M', 'L', 'XL'],
+            deliveryActiveSizes: delActiveSizes.length > 0 ? delActiveSizes : activeSizes,
+            storeActiveSizes: storeActiveSizes.length > 0 ? storeActiveSizes : activeSizes,
+            wholesaleActiveSizes: wsActiveSizes.length > 0 ? wsActiveSizes : activeSizes,
           };
         });
 
@@ -705,6 +731,9 @@ export default function AddProductModal({
         wholesaleStocks: initWs,
         serieComposition: initSerieComp,
         activeSizes: [...generatedSizesList],
+        deliveryActiveSizes: [...generatedSizesList],
+        storeActiveSizes: [...generatedSizesList],
+        wholesaleActiveSizes: [...generatedSizesList],
       },
     ]);
   };
@@ -768,29 +797,66 @@ export default function AddProductModal({
     }
   };
 
-  // Size Chip Toggles for specific color
+  // Size Chip Toggles for specific color isolated strictly by activeWarehouse context
   const handleToggleColorSize = (colorId: string, size: string) => {
     setColors((prev) =>
       prev.map((c) => {
         if (c.id !== colorId) return c;
-        const exists = c.activeSizes.includes(size);
+        const key =
+          activeWarehouse === 'DELIVERY'
+            ? 'deliveryActiveSizes'
+            : activeWarehouse === 'STORE'
+            ? 'storeActiveSizes'
+            : 'wholesaleActiveSizes';
+        const currentList = c[key] || c.activeSizes || [];
+        const exists = currentList.includes(size);
         const nextActive = exists
-          ? c.activeSizes.filter((s) => s !== size)
-          : [...c.activeSizes, size];
-        return { ...c, activeSizes: nextActive };
+          ? currentList.filter((s) => s !== size)
+          : [...currentList, size];
+        return {
+          ...c,
+          [key]: nextActive,
+          activeSizes: nextActive,
+        };
       })
     );
   };
 
   const handleSelectAllSizesForColor = (colorId: string) => {
     setColors((prev) =>
-      prev.map((c) => (c.id === colorId ? { ...c, activeSizes: [...generatedSizesList] } : c))
+      prev.map((c) => {
+        if (c.id !== colorId) return c;
+        const key =
+          activeWarehouse === 'DELIVERY'
+            ? 'deliveryActiveSizes'
+            : activeWarehouse === 'STORE'
+            ? 'storeActiveSizes'
+            : 'wholesaleActiveSizes';
+        return {
+          ...c,
+          [key]: [...generatedSizesList],
+          activeSizes: [...generatedSizesList],
+        };
+      })
     );
   };
 
   const handleDeselectAllSizesForColor = (colorId: string) => {
     setColors((prev) =>
-      prev.map((c) => (c.id === colorId ? { ...c, activeSizes: [] } : c))
+      prev.map((c) => {
+        if (c.id !== colorId) return c;
+        const key =
+          activeWarehouse === 'DELIVERY'
+            ? 'deliveryActiveSizes'
+            : activeWarehouse === 'STORE'
+            ? 'storeActiveSizes'
+            : 'wholesaleActiveSizes';
+        return {
+          ...c,
+          [key]: [],
+          activeSizes: [],
+        };
+      })
     );
   };
 
@@ -1120,14 +1186,17 @@ export default function AddProductModal({
         currentWarehouseData.superGrosThreshold = Number(superGrosThreshold) || 10;
         currentWarehouseData.serieComposition = sanitizedColors[0]?.serieComposition || null;
         currentWarehouseData.serieCompositions = serieCompositionsMap;
+        currentWarehouseData.activeSizes = sanitizedColors.map((c) => ({ color: c.colorName.trim(), sizes: c.wholesaleActiveSizes || c.activeSizes }));
       } else if (activeWarehouse === 'DELIVERY') {
         currentWarehouseData.sellingPrice = sellingPrice !== '' ? Number(sellingPrice) : null;
         currentWarehouseData.oldPrice = oldPrice !== '' ? Number(oldPrice) : null;
         currentWarehouseData.bulkPrice = bulkDiscountPrice5 !== '' ? Number(bulkDiscountPrice5) : null;
+        currentWarehouseData.activeSizes = sanitizedColors.map((c) => ({ color: c.colorName.trim(), sizes: c.deliveryActiveSizes || c.activeSizes }));
       } else if (activeWarehouse === 'STORE') {
         currentWarehouseData.storePrice = sellingPrice !== '' ? Number(sellingPrice) : null;
-        currentWarehouseData.sellingPrice = sellingPrice !== '' ? Number(sellingPrice) : null;
-        currentWarehouseData.oldPrice = oldPrice !== '' ? Number(oldPrice) : null;
+        currentWarehouseData.storeOldPrice = oldPrice !== '' ? Number(oldPrice) : null;
+        currentWarehouseData.storeBulkPrice = bulkDiscountPrice5 !== '' ? Number(bulkDiscountPrice5) : null;
+        currentWarehouseData.activeSizes = sanitizedColors.map((c) => ({ color: c.colorName.trim(), sizes: c.storeActiveSizes || c.activeSizes }));
       }
 
       const metaPayload = {
@@ -1191,7 +1260,16 @@ export default function AddProductModal({
               .filter(Boolean)
           : [];
 
-        const allSizesForColor = Array.from(new Set([...c.activeSizes, ...existingSizesForColor]));
+        const delActiveList = c.deliveryActiveSizes || c.activeSizes;
+        const storeActiveList = c.storeActiveSizes || c.activeSizes;
+        const wsActiveList = c.wholesaleActiveSizes || c.activeSizes;
+
+        const allSizesForColor = Array.from(new Set([
+          ...delActiveList,
+          ...storeActiveList,
+          ...wsActiveList,
+          ...existingSizesForColor,
+        ]));
 
         allSizesForColor.forEach((s) => {
           const existingV = existingDbVariants.find(
@@ -1205,25 +1283,29 @@ export default function AddProductModal({
           let finalWs = existingV ? Number(existingV.wholesale_stock) || 0 : 0;
           let finalSerieComp = existingV ? (existingV.serie_composition || (existingV as any).serieComposition) : undefined;
 
-          if (activeWarehouse === 'DELIVERY') {
-            if (c.activeSizes.includes(s)) {
+          if (delActiveList.includes(s)) {
+            if (activeWarehouse === 'DELIVERY') {
               finalDel = c.deliveryStocks[s] !== undefined ? c.deliveryStocks[s] : (isEditMode && existingV ? finalDel : 10);
-            } else {
-              finalDel = 0;
             }
-          } else if (activeWarehouse === 'STORE') {
-            if (c.activeSizes.includes(s)) {
+          } else {
+            finalDel = 0;
+          }
+
+          if (storeActiveList.includes(s)) {
+            if (activeWarehouse === 'STORE') {
               finalStore = c.storeStocks[s] !== undefined ? c.storeStocks[s] : (isEditMode && existingV ? finalStore : 5);
-            } else {
-              finalStore = 0;
             }
-          } else if (activeWarehouse === 'WHOLESALE') {
-            if (c.activeSizes.includes(s)) {
-              finalWs = 0;
+          } else {
+            finalStore = 0;
+          }
+
+          if (wsActiveList.includes(s)) {
+            if (activeWarehouse === 'WHOLESALE') {
+              finalWs = c.wholesaleStocks[s] !== undefined ? c.wholesaleStocks[s] : (isEditMode && existingV ? finalWs : 0);
               finalSerieComp = c.serieComposition;
-            } else {
-              finalWs = 0;
             }
+          } else {
+            finalWs = 0;
           }
 
           const colImg = c.imageUrl || undefined;
@@ -1300,20 +1382,22 @@ export default function AddProductModal({
         updatedProdObj.supplierPhone = supplierPhone.trim() || (productToEdit as any)?.supplier_phone || productToEdit?.supplierPhone || undefined;
         
         if (activeWarehouse === 'STORE') {
-          updatedProdObj.storePrice = sellingPrice !== '' ? Number(sellingPrice) : ((productToEdit as any)?.store_price ?? (productToEdit as any)?.storePrice ?? productToEdit?.storePrice ?? null);
-          updatedProdObj.sellingPrice = (productToEdit as any)?.selling_price ?? productToEdit?.sellingPrice ?? 0;
+          updatedProdObj.storePrice = sellingPrice !== '' ? Number(sellingPrice) : productToEdit.storePrice ?? null;
+          updatedProdObj.storeOldPrice = oldPrice !== '' ? Number(oldPrice) : productToEdit.storeOldPrice ?? null;
+          updatedProdObj.storeBulkPrice = bVal ?? productToEdit.storeBulkPrice ?? null;
+          updatedProdObj.sellingPrice = productToEdit.sellingPrice ?? 0;
+          updatedProdObj.oldPrice = productToEdit.oldPrice ?? null;
+          updatedProdObj.bulkPrice = productToEdit.bulkPrice ?? null;
         } else if (activeWarehouse === 'DELIVERY') {
-          updatedProdObj.sellingPrice = sellingPrice !== '' ? Number(sellingPrice) : ((productToEdit as any)?.selling_price ?? productToEdit?.sellingPrice ?? 0);
-          updatedProdObj.storePrice = (productToEdit as any)?.store_price ?? (productToEdit as any)?.storePrice ?? productToEdit?.storePrice ?? null;
-        } else {
-          updatedProdObj.sellingPrice = (productToEdit as any)?.selling_price ?? productToEdit?.sellingPrice ?? 0;
-          updatedProdObj.storePrice = (productToEdit as any)?.store_price ?? (productToEdit as any)?.storePrice ?? productToEdit?.storePrice ?? null;
+          updatedProdObj.sellingPrice = sellingPrice !== '' ? Number(sellingPrice) : productToEdit.sellingPrice ?? 0;
+          updatedProdObj.oldPrice = oldPrice !== '' ? Number(oldPrice) : productToEdit.oldPrice ?? null;
+          updatedProdObj.bulkPrice = bVal ?? productToEdit.bulkPrice ?? null;
+          updatedProdObj.bulk_price = bVal ?? productToEdit.bulkPrice ?? null;
+          updatedProdObj.bulkDiscountPrice5 = bVal ?? productToEdit.bulkDiscountPrice5 ?? null;
+          updatedProdObj.storePrice = productToEdit.storePrice ?? null;
+          updatedProdObj.storeOldPrice = productToEdit.storeOldPrice ?? null;
+          updatedProdObj.storeBulkPrice = productToEdit.storeBulkPrice ?? null;
         }
-
-        updatedProdObj.oldPrice = oldPrice !== '' ? Number(oldPrice) : ((productToEdit as any)?.old_price ?? productToEdit?.oldPrice ?? null);
-        updatedProdObj.bulkPrice = bVal ?? (productToEdit as any)?.bulk_price ?? productToEdit?.bulkPrice ?? null;
-        updatedProdObj.bulk_price = bVal ?? (productToEdit as any)?.bulk_price ?? productToEdit?.bulkPrice ?? null;
-        updatedProdObj.bulkDiscountPrice5 = bVal ?? productToEdit?.bulkDiscountPrice5;
 
         updatedProdObj.wholesalePrice = wholesalePrice !== '' ? Number(wholesalePrice) : ((productToEdit as any)?.wholesale_price ?? productToEdit?.wholesalePrice ?? null);
         updatedProdObj.superGrosPrice = superGrosPrice !== '' ? Number(superGrosPrice) : ((productToEdit as any)?.super_gros_price ?? productToEdit?.superGrosPrice ?? null);

@@ -593,6 +593,16 @@ export default function InventoryGrid({
                                     سعر المحل غير محدد
                                   </span>
                                 )}
+                                {product.storeOldPrice && Number(product.storeOldPrice) > 0 && (
+                                  <span className="text-xs text-gray-400 line-through font-mono">
+                                    {product.storeOldPrice} د.ج
+                                  </span>
+                                )}
+                                {product.storeBulkPrice && Number(product.storeBulkPrice) > 0 && (
+                                  <span className="text-[10px] font-bold text-amber-900 font-mono bg-amber-100/60 px-2 py-0.5 rounded-md border border-amber-300/80" title="سعر 5 حبات فما فوق للمحل">
+                                    5+ حبات المحل: {product.storeBulkPrice} د.ج
+                                  </span>
+                                )}
                               </div>
                             ) : (
                               <div className="flex items-center gap-2 flex-wrap">
