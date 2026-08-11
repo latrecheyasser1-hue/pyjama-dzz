@@ -1541,15 +1541,15 @@ export default function AddProductModal({
             </div>
           </div>
 
-          {/* SECTION B: Context-Aware Pricing Section */}
+          {/* SECTION B: Complete Pricing Architecture (All Tiers Available) */}
           <div className="space-y-4 bg-pyjama-cream/40 p-5 rounded-3xl border border-gray-100">
             <div className="flex items-center justify-between border-b border-gray-200/80 pb-3">
               <h3 className="text-sm font-bold text-[#7A1C32] flex items-center gap-2">
                 <DollarSign className="w-4 h-4 text-[#8A2B43]" />
-                <span>ثانياً: الأسعار (Pricing DZD)</span>
+                <span>ثانياً: الأسعار وتخفيضات المنتج (Pricing & Compare-at Prices DZD)</span>
               </h3>
 
-              {discountPercent !== null && activeWarehouse !== 'WHOLESALE' && (
+              {discountPercent !== null && (
                 <span className="px-3 py-1 bg-rose-100 text-rose-700 border border-rose-200 rounded-full text-xs font-bold flex items-center gap-1 animate-pulse">
                   <Sparkles className="w-3.5 h-3.5" />
                   <span>خصم {discountPercent}% 🔥</span>
@@ -1567,103 +1567,95 @@ export default function AddProductModal({
                   type="number"
                   value={costPrice}
                   onChange={(e) => setCostPrice(e.target.value)}
-                  placeholder=""
+                  placeholder="0"
                   className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold focus:outline-none focus:border-[#8A2B43] shadow-sm"
                 />
               </div>
 
-              {/* DELIVERY WAREHOUSE PRICING INPUTS */}
-              {activeWarehouse === 'DELIVERY' && (
-                <>
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                      سعر البيع للتوصيل (Prix Vente Delivery DZD) <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      value={sellingPrice}
-                      onChange={(e) => setSellingPrice(e.target.value)}
-                      placeholder=""
-                      className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold text-[#8A2B43] focus:outline-none focus:border-[#8A2B43] shadow-sm"
-                    />
-                  </div>
+              {/* Delivery Selling Price */}
+              <div>
+                <label className="block text-xs font-bold text-[#8A2B43] mb-1">
+                  سعر البيع بالتجزئة - التوصيل (Vente Delivery DZD)
+                </label>
+                <input
+                  type="number"
+                  value={sellingPrice}
+                  onChange={(e) => setSellingPrice(e.target.value)}
+                  placeholder="0"
+                  className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold text-[#8A2B43] focus:outline-none focus:border-[#8A2B43] shadow-sm"
+                />
+              </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-gray-700 mb-1">
-                      السعر القديم قبل الخصم (Old Price DZD)
-                    </label>
-                    <input
-                      type="number"
-                      value={oldPrice}
-                      onChange={(e) => setOldPrice(e.target.value)}
-                      placeholder=""
-                      className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold text-gray-400 focus:outline-none focus:border-[#8A2B43] shadow-sm"
-                    />
-                  </div>
+              {/* Store Selling Price */}
+              <div>
+                <label className="block text-xs font-bold text-[#8A2B43] mb-1">
+                  سعر البيع بمحل الشلف (Vente Magasin DZD)
+                </label>
+                <input
+                  type="number"
+                  value={storePrice}
+                  onChange={(e) => setStorePrice(e.target.value)}
+                  placeholder="0"
+                  className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold text-[#8A2B43] focus:outline-none focus:border-[#8A2B43] shadow-sm"
+                />
+              </div>
 
-                  {/* Strictly Controlled bulk_price Input */}
-                  <div>
-                    <label className="block text-xs font-bold text-[#8A2B43] mb-1">
-                      سعر 5 حبات فما فوق
-                    </label>
-                    <input
-                      type="number"
-                      name="bulk_price"
-                      value={bulkDiscountPrice5 ?? ''}
-                      onChange={(e) => setBulkDiscountPrice5(e.target.value)}
-                      placeholder=""
-                      className="w-full px-4 py-3 bg-white rounded-xl border border-pyjama-pink text-xs font-mono font-bold text-[#8A2B43] focus:outline-none focus:border-[#8A2B43] shadow-sm"
-                    />
-                  </div>
-                </>
-              )}
+              {/* Old / Compare-at Strikethrough Price (Prix Barré) - ALWAYS RESTORED & VISIBLE */}
+              <div>
+                <label className="block text-xs font-bold text-gray-500 mb-1">
+                  السعر القديم المشطوب (Ancien Prix / Compare-at DZD)
+                </label>
+                <input
+                  type="number"
+                  value={oldPrice}
+                  onChange={(e) => setOldPrice(e.target.value)}
+                  placeholder="0"
+                  className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold text-gray-400 focus:outline-none focus:border-[#8A2B43] shadow-sm"
+                />
+              </div>
 
-              {/* STORE WAREHOUSE PRICING INPUTS */}
-              {activeWarehouse === 'STORE' && (
-                <div>
-                  <label className="block text-xs font-bold text-gray-700 mb-1">
-                    سعر البيع بمحل الشلف (Prix Vente Magasin DZD) <span className="text-rose-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    value={storePrice}
-                    onChange={(e) => setStorePrice(e.target.value)}
-                    placeholder=""
-                    className="w-full px-4 py-3 bg-white rounded-xl border border-gray-200 text-xs font-mono font-bold text-[#8A2B43] focus:outline-none focus:border-[#8A2B43] shadow-sm"
-                  />
-                </div>
-              )}
+              {/* Bulk 5+ Price */}
+              <div>
+                <label className="block text-xs font-bold text-[#8A2B43] mb-1">
+                  سعر 5 حبات فما فوق (Bulk 5+ DZD)
+                </label>
+                <input
+                  type="number"
+                  name="bulk_price"
+                  value={bulkDiscountPrice5 ?? ''}
+                  onChange={(e) => setBulkDiscountPrice5(e.target.value)}
+                  placeholder="0"
+                  className="w-full px-4 py-3 bg-white rounded-xl border border-pyjama-pink text-xs font-mono font-bold text-[#8A2B43] focus:outline-none focus:border-[#8A2B43] shadow-sm"
+                />
+              </div>
 
-              {/* WHOLESALE & SUPER GROS PRICES SHOWN ONLY IN WHOLESALE WAREHOUSE CONTEXT */}
-              {activeWarehouse === 'WHOLESALE' && (
-                <>
-                  <div>
-                    <label className="block text-xs font-bold text-purple-900 mb-1">
-                      سعر البيع بالجملة العادي (Prix Gros DZD) <span className="text-rose-500">*</span>
-                    </label>
-                    <input
-                      type="number"
-                      value={wholesalePrice}
-                      onChange={(e) => setWholesalePrice(e.target.value)}
-                      placeholder=""
-                      className="w-full px-4 py-3 bg-white rounded-xl border border-purple-200 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-purple-800 shadow-sm"
-                    />
-                  </div>
+              {/* Wholesale Price */}
+              <div>
+                <label className="block text-xs font-bold text-purple-900 mb-1">
+                  سعر البيع بالجملة العادي (Prix Gros DZD)
+                </label>
+                <input
+                  type="number"
+                  value={wholesalePrice}
+                  onChange={(e) => setWholesalePrice(e.target.value)}
+                  placeholder="0"
+                  className="w-full px-4 py-3 bg-white rounded-xl border border-purple-200 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-purple-800 shadow-sm"
+                />
+              </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-purple-900 mb-1">
-                      سعر البيع بالجملة الكبيرة (Prix Super Gros DZD)
-                    </label>
-                    <input
-                      type="number"
-                      value={superGrosPrice}
-                      onChange={(e) => setSuperGrosPrice(e.target.value)}
-                      placeholder=""
-                      className="w-full px-4 py-3 bg-white rounded-xl border border-purple-200 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-purple-800 shadow-sm"
-                    />
-                  </div>
-                </>
-              )}
+              {/* Super Gros Price */}
+              <div>
+                <label className="block text-xs font-bold text-purple-900 mb-1">
+                  سعر البيع بالجملة الكبيرة (Prix Super Gros DZD)
+                </label>
+                <input
+                  type="number"
+                  value={superGrosPrice}
+                  onChange={(e) => setSuperGrosPrice(e.target.value)}
+                  placeholder="0"
+                  className="w-full px-4 py-3 bg-white rounded-xl border border-purple-200 text-xs font-mono font-bold text-purple-900 focus:outline-none focus:border-purple-800 shadow-sm"
+                />
+              </div>
             </div>
           </div>
 
