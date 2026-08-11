@@ -649,7 +649,8 @@ export default function InventoryGrid({
                               return 2;
                             };
 
-                            const actualUnitsPerSerie = product.unitsPerSerie || firstColorVars.reduce((acc, v) => acc + getVariantSerieQty(v), 0) || (firstColorVars.length * 2) || 8;
+                            const activeSerieVars = firstColorVars.filter((v) => getVariantSerieQty(v) > 0);
+                            const actualUnitsPerSerie = product.unitsPerSerie || activeSerieVars.reduce((acc, v) => acc + getVariantSerieQty(v), 0) || (activeSerieVars.length * 2) || 8;
 
                             return (
                               <div className="bg-purple-50/70 p-3.5 rounded-2xl border border-purple-200/80 space-y-2">
@@ -664,7 +665,7 @@ export default function InventoryGrid({
 
                                 {/* Série Size Composition Badges */}
                                 <div className="flex flex-wrap gap-1.5 pt-1 dir-ltr" dir="ltr">
-                                  {firstColorVars.map((v) => {
+                                  {activeSerieVars.map((v) => {
                                     const compQty = getVariantSerieQty(v);
                                     return (
                                       <span

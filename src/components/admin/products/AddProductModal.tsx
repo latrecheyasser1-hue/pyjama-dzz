@@ -1278,15 +1278,29 @@ export default function AddProductModal({
               .filter(Boolean)
           : [];
 
-        const delActiveList = c.deliveryActiveSizes || c.activeSizes;
-        const storeActiveList = c.storeActiveSizes || c.activeSizes;
-        const wsActiveList = c.wholesaleActiveSizes || c.activeSizes;
+        // Ensure active warehouse sizes are strictly restricted to generatedSizesList
+        let delActiveList = (c.deliveryActiveSizes || c.activeSizes || []).filter((s) => generatedSizesList.includes(s));
+        let storeActiveList = (c.storeActiveSizes || c.activeSizes || []).filter((s) => generatedSizesList.includes(s));
+        let wsActiveList = (c.wholesaleActiveSizes || c.activeSizes || []).filter((s) => generatedSizesList.includes(s));
+
+        if (activeWarehouse === 'DELIVERY') {
+          delActiveList = c.activeSizes.filter((s) => generatedSizesList.includes(s));
+          if (delActiveList.length === 0) delActiveList = [...generatedSizesList];
+          c.deliveryActiveSizes = delActiveList;
+        } else if (activeWarehouse === 'STORE') {
+          storeActiveList = c.activeSizes.filter((s) => generatedSizesList.includes(s));
+          if (storeActiveList.length === 0) storeActiveList = [...generatedSizesList];
+          c.storeActiveSizes = storeActiveList;
+        } else if (activeWarehouse === 'WHOLESALE') {
+          wsActiveList = c.activeSizes.filter((s) => generatedSizesList.includes(s));
+          if (wsActiveList.length === 0) wsActiveList = [...generatedSizesList];
+          c.wholesaleActiveSizes = wsActiveList;
+        }
 
         const allSizesForColor = Array.from(new Set([
           ...delActiveList,
           ...storeActiveList,
           ...wsActiveList,
-          ...existingSizesForColor,
         ]));
 
         allSizesForColor.forEach((s) => {
