@@ -609,95 +609,176 @@ export default function InventoryGrid({
                         </div>
                       </div>
 
-                      {/* Color & Size Breakdown per Color */}
-                      <div className="space-y-3 pt-3 border-t border-gray-100">
-                        {Object.entries(groupedColors).map(([colorName, colorVars]) => {
-                          const hexColorVal = getColorHex(colorName, colorVars?.[0], product);
-                          const sortedColorVars = sortVariantsAscending(colorVars);
+                      {/* Wholesale View: Série Composition & Color Swatch Badges vs Retail View */}
+                      {activeStockTab === 'WHOLESALE' ? (
+                        <div className="space-y-3 pt-3 border-t border-gray-100">
+                          {/* Top Section: Standard Wholesale Série Composition Breakdown */}
+                          <div className="bg-purple-50/70 p-3.5 rounded-2xl border border-purple-200/80 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-black text-purple-900 flex items-center gap-1.5">
+                                <Layers className="w-3.5 h-3.5 text-purple-700" />
+                                <span>تكوين السيرية الواحدة (Série Bundle)</span>
+                              </span>
+                              <span className="text-[11px] font-mono font-black text-purple-800 bg-purple-100/90 px-2 py-0.5 rounded-md border border-purple-300/80">
+                                {product.unitsPerSerie || (Object.values(groupedColors)[0] || []).length || 4} قطعة / سيرية
+                              </span>
+                            </div>
 
-                          return (
-                            <div
-                              key={colorName}
-                              className="bg-pyjama-cream/50 p-3.5 rounded-2xl border border-gray-200/80 space-y-3"
-                            >
-                              {/* Color Title with Dynamic Color Swatch Circle */}
-                              <div className="flex items-center justify-between">
-                                <div className="flex items-center gap-2">
-                                  <span
-                                    className="w-5 h-5 rounded-full border border-gray-300 shadow-sm shrink-0"
-                                    style={{ backgroundColor: hexColorVal }}
-                                    title={`درجة اللون: ${colorName}`}
-                                  />
-                                  <span className="text-xs font-black text-gray-900 tracking-wide">
-                                    {colorName}
-                                  </span>
-                                </div>
-                              </div>
-
-                              {/* 2-Column Side-by-Side Size Grid (Left-to-Right Flow) */}
-                              <div className="grid grid-cols-2 gap-2 dir-ltr" dir="ltr">
-                                {sortedColorVars.map((v) => {
-                                  const stockQty =
-                                    activeStockTab === 'DELIVERY'
-                                      ? v.deliveryStock
-                                      : activeStockTab === 'STORE'
-                                      ? v.storeStock
-                                      : v.wholesaleStock;
-
+                            {/* Série Size Composition Badges */}
+                            <div className="flex flex-wrap gap-1.5 pt-1 dir-ltr" dir="ltr">
+                              {(() => {
+                                const firstColorVars = sortVariantsAscending(Object.values(groupedColors)[0] || []);
+                                return firstColorVars.map((v) => {
+                                  const compQty = v.serieComposition?.[v.size] || 1;
                                   return (
-                                    <div
+                                    <span
                                       key={v.id}
-                                      className={`px-2 py-1.5 rounded-2xl text-xs font-mono font-bold border flex items-center justify-between transition-all shadow-xs ${
-                                        stockQty > 0
-                                          ? 'bg-white text-gray-900 border-gray-300 hover:border-[#8A2B43]/50'
-                                          : 'bg-rose-50/80 text-rose-700 border-rose-200 opacity-90'
-                                      }`}
+                                      className="px-2 py-1 rounded-xl bg-white text-purple-950 font-mono font-bold text-xs border border-purple-200 shadow-xs flex items-center gap-1"
                                     >
-                                      {/* Size Label Badge */}
-                                      <span className="px-1.5 py-0.5 rounded-lg bg-gray-100 text-gray-900 font-extrabold text-xs border border-gray-200/80 shrink-0">
-                                        {v.size}
+                                      <span className="font-extrabold">{v.size}</span>
+                                      <span className="text-purple-700 font-black">×{compQty}</span>
+                                    </span>
+                                  );
+                                });
+                              })()}
+                            </div>
+                          </div>
+
+                          {/* Bottom Section: Available Wholesale Colors */}
+                          <div className="bg-pyjama-cream/40 p-3.5 rounded-2xl border border-gray-200/80 space-y-2.5">
+                            <h5 className="text-xs font-black text-gray-900">الألوان المتاحة للجملة:</h5>
+
+                            <div className="space-y-2">
+                              {Object.entries(groupedColors).map(([colorName, colorVars]) => {
+                                const hexColorVal = getColorHex(colorName, colorVars?.[0], product);
+                                const totalColorPieces = colorVars.reduce((sum, v) => sum + (v.wholesaleStock || 0), 0);
+                                const totalUnitsPerSerie = product.unitsPerSerie || colorVars.length || 1;
+                                const seriesAvailable = Math.floor(totalColorPieces / totalUnitsPerSerie);
+
+                                return (
+                                  <div
+                                    key={colorName}
+                                    className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-gray-200 shadow-xs"
+                                  >
+                                    <div className="flex items-center gap-2.5">
+                                      <span
+                                        className="w-5 h-5 rounded-full border border-gray-300 shadow-sm shrink-0"
+                                        style={{ backgroundColor: hexColorVal }}
+                                        title={`درجة اللون: ${colorName}`}
+                                      />
+                                      <span className="text-xs font-bold text-gray-900">
+                                        {colorName}
                                       </span>
+                                    </div>
 
-                                      {/* Stock Modifier Buttons & Quantity Display */}
-                                      <div className="flex items-center gap-1 shrink-0">
-                                        {/* Decrease Stock Button */}
-                                        <button
-                                          type="button"
-                                          onClick={(e) => handleStockChange(v.id, stockQty, -1, e)}
-                                          className="w-5 h-5 rounded-lg bg-gray-100 hover:bg-[#8A2B43] hover:text-white text-gray-800 font-black flex items-center justify-center text-xs transition-all shrink-0 active:scale-95 border border-gray-200/80"
-                                          title="إنقاص الكمية -1"
-                                        >
-                                          -
-                                        </button>
+                                    <div className="flex items-center gap-2">
+                                      <span
+                                        className={`px-2.5 py-1 rounded-lg text-xs font-mono font-black border ${
+                                          seriesAvailable > 0
+                                            ? 'bg-purple-50 text-purple-900 border-purple-200'
+                                            : 'bg-rose-50 text-rose-700 border-rose-200'
+                                        }`}
+                                      >
+                                        {seriesAvailable > 0 ? `${seriesAvailable} سيرية متوفرة` : 'غير متوفر بالجملة'}
+                                      </span>
+                                    </div>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        /* Retail & Store View: 2-Column Size Breakdown */
+                        <div className="space-y-3 pt-3 border-t border-gray-100">
+                          {Object.entries(groupedColors).map(([colorName, colorVars]) => {
+                            const hexColorVal = getColorHex(colorName, colorVars?.[0], product);
+                            const sortedColorVars = sortVariantsAscending(colorVars);
 
-                                        <span
-                                          className={
-                                            stockQty > 0
-                                              ? 'text-[#8A2B43] font-black text-xs min-w-[14px] text-center'
-                                              : 'text-rose-600 font-black text-xs min-w-[14px] text-center'
-                                          }
-                                        >
-                                          {stockQty}
+                            return (
+                              <div
+                                key={colorName}
+                                className="bg-pyjama-cream/50 p-3.5 rounded-2xl border border-gray-200/80 space-y-3"
+                              >
+                                {/* Color Title with Dynamic Color Swatch Circle */}
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-2">
+                                    <span
+                                      className="w-5 h-5 rounded-full border border-gray-300 shadow-sm shrink-0"
+                                      style={{ backgroundColor: hexColorVal }}
+                                      title={`درجة اللون: ${colorName}`}
+                                    />
+                                    <span className="text-xs font-black text-gray-900 tracking-wide">
+                                      {colorName}
+                                    </span>
+                                  </div>
+                                </div>
+
+                                {/* 2-Column Side-by-Side Size Grid (Left-to-Right Flow) */}
+                                <div className="grid grid-cols-2 gap-2 dir-ltr" dir="ltr">
+                                  {sortedColorVars.map((v) => {
+                                    const stockQty =
+                                      activeStockTab === 'DELIVERY'
+                                        ? v.deliveryStock
+                                        : activeStockTab === 'STORE'
+                                        ? v.storeStock
+                                        : v.wholesaleStock;
+
+                                    return (
+                                      <div
+                                        key={v.id}
+                                        className={`px-2 py-1.5 rounded-2xl text-xs font-mono font-bold border flex items-center justify-between transition-all shadow-xs ${
+                                          stockQty > 0
+                                            ? 'bg-white text-gray-900 border-gray-300 hover:border-[#8A2B43]/50'
+                                            : 'bg-rose-50/80 text-rose-700 border-rose-200 opacity-90'
+                                        }`}
+                                      >
+                                        {/* Size Label Badge */}
+                                        <span className="px-1.5 py-0.5 rounded-lg bg-gray-100 text-gray-900 font-extrabold text-xs border border-gray-200/80 shrink-0">
+                                          {v.size}
                                         </span>
 
-                                        {/* Increase Stock Button */}
-                                        <button
-                                          type="button"
-                                          onClick={(e) => handleStockChange(v.id, stockQty, 1, e)}
-                                          className="w-5 h-5 rounded-lg bg-gray-100 hover:bg-[#8A2B43] hover:text-white text-gray-800 font-black flex items-center justify-center text-xs transition-all shrink-0 active:scale-95 border border-gray-200/80"
-                                          title="زيادة الكمية +1"
-                                        >
-                                          +
-                                        </button>
+                                        {/* Stock Modifier Buttons & Quantity Display */}
+                                        <div className="flex items-center gap-1 shrink-0">
+                                          {/* Decrease Stock Button */}
+                                          <button
+                                            type="button"
+                                            onClick={(e) => handleStockChange(v.id, stockQty, -1, e)}
+                                            className="w-5 h-5 rounded-lg bg-gray-100 hover:bg-[#8A2B43] hover:text-white text-gray-800 font-black flex items-center justify-center text-xs transition-all shrink-0 active:scale-95 border border-gray-200/80"
+                                            title="إنقاص الكمية -1"
+                                          >
+                                            -
+                                          </button>
+
+                                          <span
+                                            className={
+                                              stockQty > 0
+                                                ? 'text-[#8A2B43] font-black text-xs min-w-[14px] text-center'
+                                                : 'text-rose-600 font-black text-xs min-w-[14px] text-center'
+                                            }
+                                          >
+                                            {stockQty}
+                                          </span>
+
+                                          {/* Increase Stock Button */}
+                                          <button
+                                            type="button"
+                                            onClick={(e) => handleStockChange(v.id, stockQty, 1, e)}
+                                            className="w-5 h-5 rounded-lg bg-gray-100 hover:bg-[#8A2B43] hover:text-white text-gray-800 font-black flex items-center justify-center text-xs transition-all shrink-0 active:scale-95 border border-gray-200/80"
+                                            title="زيادة الكمية +1"
+                                          >
+                                            +
+                                          </button>
+                                        </div>
                                       </div>
-                                    </div>
-                                  );
-                                })}
+                                    );
+                                  })}
+                                </div>
                               </div>
-                            </div>
-                          );
-                        })}
-                      </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
