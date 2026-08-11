@@ -931,52 +931,62 @@ export default function AddProductModal({
       cleanPayload.category_id = null;
     }
 
+    const tryUpdate = async (p: Record<string, any>) => {
+      let { data, error } = await supabase.from('products').update(p).eq('id', targetProductId).select();
+      if (!error && data && data.length > 0) return { data: data[0], error: null };
+
+      let { error: directErr } = await supabase.from('products').update(p).eq('id', targetProductId);
+      if (!directErr) return { data: { id: targetProductId, ...p }, error: null };
+
+      return { data: null, error: directErr || error };
+    };
+
+    const tryInsert = async (p: Record<string, any>) => {
+      let { data, error } = await supabase.from('products').insert([p]).select();
+      if (!error && data && data.length > 0) return { data: data[0], error: null };
+
+      let { error: directErr } = await supabase.from('products').insert([p]);
+      if (!directErr) return { data: p, error: null };
+
+      return { data: null, error: directErr || error };
+    };
+
     if (targetProductId) {
-      // 1. Primary Update Attempt with select
-      let { data, error } = await supabase
-        .from('products')
-        .update(cleanPayload)
-        .eq('id', targetProductId)
-        .select();
+      let updateRes = await tryUpdate(cleanPayload);
+      if (!updateRes.error) return updateRes;
 
-      if (!error && data && data.length > 0) {
-        return { data: data[0], error: null };
+      // Iterative schema cache fallback: strip un-migrated schema columns if error indicates missing column
+      const optionalCols = ['min_wholesale_series', 'super_gros_threshold', 'super_gros_price', 'wholesale_price', 'units_per_serie', 'bulk_price', 'bulk_discount_price_5'];
+      const fallbackPayload = { ...cleanPayload };
+      for (const col of optionalCols) {
+        const errString = JSON.stringify(updateRes.error || {});
+        if (errString.includes(col) || errString.includes('schema cache') || errString.includes('Could not find')) {
+          delete fallbackPayload[col];
+          updateRes = await tryUpdate(fallbackPayload);
+          if (!updateRes.error) return updateRes;
+        }
       }
 
-      // 2. Direct Update without select if select return is empty
-      let { error: directUpdateErr } = await supabase
-        .from('products')
-        .update(cleanPayload)
-        .eq('id', targetProductId);
+      console.error('Update Error Detail:', updateRes.error);
+      return updateRes;
+    }
 
-      if (!directUpdateErr) {
-        return { data: { id: targetProductId, ...cleanPayload }, error: null };
+    let insertRes = await tryInsert(cleanPayload);
+    if (!insertRes.error) return insertRes;
+
+    const optionalCols = ['min_wholesale_series', 'super_gros_threshold', 'super_gros_price', 'wholesale_price', 'units_per_serie', 'bulk_price', 'bulk_discount_price_5'];
+    const fallbackInsertPayload = { ...cleanPayload };
+    for (const col of optionalCols) {
+      const errString = JSON.stringify(insertRes.error || {});
+      if (errString.includes(col) || errString.includes('schema cache') || errString.includes('Could not find')) {
+        delete fallbackInsertPayload[col];
+        insertRes = await tryInsert(fallbackInsertPayload);
+        if (!insertRes.error) return insertRes;
       }
-
-      console.error('Update Error Detail:', directUpdateErr || error);
-      return { data: null, error: directUpdateErr || error };
     }
 
-    // Insert mode for NEW product
-    let { data, error } = await supabase
-      .from('products')
-      .insert([cleanPayload])
-      .select();
-
-    if (!error && data && data.length > 0) {
-      return { data: data[0], error: null };
-    }
-
-    let { error: directInsertErr } = await supabase
-      .from('products')
-      .insert([cleanPayload]);
-
-    if (!directInsertErr) {
-      return { data: cleanPayload, error: null };
-    }
-
-    console.error('Insert Error Detail:', directInsertErr || error);
-    return { data: null, error: directInsertErr || error };
+    console.error('Insert Error Detail:', insertRes.error);
+    return insertRes;
   };
 
   // Context-Isolated Supabase Submit Handler with Zero-Stock Defaults for Inactive Warehouses
@@ -1048,8 +1058,17 @@ export default function AddProductModal({
         .replace(/<!--COLOR_METADATA:[\s\S]*?-->/g, '')
         .trim();
 
-      const metaPayload = { images: colorImageMap, hexes: colorHexMap, sizeCategory: sizeCategory };
-      if (Object.keys(colorImageMap).length > 0 || Object.keys(colorHexMap).length > 0 || sizeCategory) {
+      const metaPayload = {
+        images: colorImageMap,
+        hexes: colorHexMap,
+        sizeCategory: sizeCategory,
+        wholesalePrice: wholesalePrice !== '' ? Number(wholesalePrice) : null,
+        superGrosPrice: superGrosPrice !== '' ? Number(superGrosPrice) : null,
+        unitsPerSerie: firstColorTotalItemsInSerie,
+        minWholesaleSeries: Number(minWholesaleSeries) || 1,
+        superGrosThreshold: Number(superGrosThreshold) || 10,
+      };
+      if (Object.keys(colorImageMap).length > 0 || Object.keys(colorHexMap).length > 0 || sizeCategory || wholesalePrice !== '') {
         finalDesc = `${finalDesc}\n<!--COLOR_METADATA:${JSON.stringify(metaPayload)}-->`.trim();
       }
 
