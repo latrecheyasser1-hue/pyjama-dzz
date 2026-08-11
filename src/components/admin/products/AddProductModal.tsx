@@ -1125,6 +1125,7 @@ export default function AddProductModal({
         currentWarehouseData.oldPrice = oldPrice !== '' ? Number(oldPrice) : null;
         currentWarehouseData.bulkPrice = bulkDiscountPrice5 !== '' ? Number(bulkDiscountPrice5) : null;
       } else if (activeWarehouse === 'STORE') {
+        currentWarehouseData.storePrice = sellingPrice !== '' ? Number(sellingPrice) : null;
         currentWarehouseData.sellingPrice = sellingPrice !== '' ? Number(sellingPrice) : null;
         currentWarehouseData.oldPrice = oldPrice !== '' ? Number(oldPrice) : null;
       }
@@ -1166,15 +1167,10 @@ export default function AddProductModal({
       productPayload.bulk_price = bVal ?? (isEditMode ? ((productToEdit as any)?.bulk_price ?? productToEdit?.bulkPrice ?? null) : null);
       productPayload.bulk_discount_price_5 = bVal ?? (isEditMode ? ((productToEdit as any)?.bulk_discount_price_5 ?? productToEdit?.bulkDiscountPrice5 ?? null) : null);
 
-      if (activeWarehouse === 'STORE') {
-        productPayload.store_price = sellingPrice !== '' ? Number(sellingPrice) : (isEditMode ? ((productToEdit as any)?.store_price ?? (productToEdit as any)?.storePrice ?? productToEdit?.storePrice ?? null) : null);
-        productPayload.selling_price = isEditMode ? ((productToEdit as any)?.selling_price ?? productToEdit?.sellingPrice ?? 0) : (sellingPrice !== '' ? Number(sellingPrice) : 0);
-      } else if (activeWarehouse === 'DELIVERY') {
+      if (activeWarehouse === 'DELIVERY') {
         productPayload.selling_price = sellingPrice !== '' ? Number(sellingPrice) : (isEditMode ? ((productToEdit as any)?.selling_price ?? productToEdit?.sellingPrice ?? 0) : 0);
-        productPayload.store_price = isEditMode ? ((productToEdit as any)?.store_price ?? (productToEdit as any)?.storePrice ?? productToEdit?.storePrice ?? null) : null;
       } else {
-        productPayload.selling_price = isEditMode ? ((productToEdit as any)?.selling_price ?? productToEdit?.sellingPrice ?? 0) : 0;
-        productPayload.store_price = isEditMode ? ((productToEdit as any)?.store_price ?? (productToEdit as any)?.storePrice ?? productToEdit?.storePrice ?? null) : null;
+        productPayload.selling_price = isEditMode ? ((productToEdit as any)?.selling_price ?? productToEdit?.sellingPrice ?? 0) : (sellingPrice !== '' ? Number(sellingPrice) : 0);
       }
 
       productPayload.wholesale_price = String(wholesalePrice) !== '' && wholesalePrice !== undefined && wholesalePrice !== null ? Number(wholesalePrice) : (isEditMode ? ((productToEdit as any)?.wholesale_price ?? productToEdit?.wholesalePrice ?? null) : null);
