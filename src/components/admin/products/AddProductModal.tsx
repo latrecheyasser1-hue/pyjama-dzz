@@ -1278,21 +1278,34 @@ export default function AddProductModal({
               .filter(Boolean)
           : [];
 
-        // Ensure active warehouse sizes are strictly restricted to generatedSizesList
-        let delActiveList = (c.deliveryActiveSizes || c.activeSizes || []).filter((s) => generatedSizesList.includes(s));
-        let storeActiveList = (c.storeActiveSizes || c.activeSizes || []).filter((s) => generatedSizesList.includes(s));
-        let wsActiveList = (c.wholesaleActiveSizes || c.activeSizes || []).filter((s) => generatedSizesList.includes(s));
+        // Preserve unedited warehouse active sizes from existingWarehousesMeta
+        const delMeta = existingWarehousesMeta.DELIVERY || {};
+        const storeMeta = existingWarehousesMeta.STORE || {};
+        const wsMeta = existingWarehousesMeta.WHOLESALE || {};
+
+        const delColorMeta = delMeta.activeSizes?.find((a: any) => a.color === colNameTrim);
+        const storeColorMeta = storeMeta.activeSizes?.find((a: any) => a.color === colNameTrim);
+        const wsColorMeta = wsMeta.activeSizes?.find((a: any) => a.color === colNameTrim);
+
+        let delActiveList = activeWarehouse === 'DELIVERY'
+          ? c.activeSizes.filter((s) => generatedSizesList.includes(s))
+          : (delColorMeta?.sizes || c.deliveryActiveSizes || c.activeSizes || []);
+
+        let storeActiveList = activeWarehouse === 'STORE'
+          ? c.activeSizes.filter((s) => generatedSizesList.includes(s))
+          : (storeColorMeta?.sizes || c.storeActiveSizes || c.activeSizes || []);
+
+        let wsActiveList = activeWarehouse === 'WHOLESALE'
+          ? c.activeSizes.filter((s) => generatedSizesList.includes(s))
+          : (wsColorMeta?.sizes || c.wholesaleActiveSizes || c.activeSizes || []);
 
         if (activeWarehouse === 'DELIVERY') {
-          delActiveList = c.activeSizes.filter((s) => generatedSizesList.includes(s));
           if (delActiveList.length === 0) delActiveList = [...generatedSizesList];
           c.deliveryActiveSizes = delActiveList;
         } else if (activeWarehouse === 'STORE') {
-          storeActiveList = c.activeSizes.filter((s) => generatedSizesList.includes(s));
           if (storeActiveList.length === 0) storeActiveList = [...generatedSizesList];
           c.storeActiveSizes = storeActiveList;
         } else if (activeWarehouse === 'WHOLESALE') {
-          wsActiveList = c.activeSizes.filter((s) => generatedSizesList.includes(s));
           if (wsActiveList.length === 0) wsActiveList = [...generatedSizesList];
           c.wholesaleActiveSizes = wsActiveList;
         }
