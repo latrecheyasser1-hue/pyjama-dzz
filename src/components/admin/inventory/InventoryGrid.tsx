@@ -615,7 +615,19 @@ export default function InventoryGrid({
                           {/* Top Section: Standard Wholesale Série Composition Breakdown */}
                           {(() => {
                             const firstColorVars = sortVariantsAscending(Object.values(groupedColors)[0] || []);
-                            const actualUnitsPerSerie = firstColorVars.reduce((acc, v) => acc + (v.serieComposition?.[v.size] || 1), 0) || firstColorVars.length || 4;
+
+                            const getVariantSerieQty = (v: ProductVariant) => {
+                              if (v.serieComposition && typeof v.serieComposition === 'object' && v.serieComposition[v.size] !== undefined) {
+                                return Number(v.serieComposition[v.size]) || 2;
+                              }
+                              if (product.unitsPerSerie && firstColorVars.length > 0) {
+                                const derived = Math.round(product.unitsPerSerie / firstColorVars.length);
+                                return derived > 0 ? derived : 2;
+                              }
+                              return 2;
+                            };
+
+                            const actualUnitsPerSerie = product.unitsPerSerie || firstColorVars.reduce((acc, v) => acc + getVariantSerieQty(v), 0) || (firstColorVars.length * 2) || 8;
 
                             return (
                               <div className="bg-purple-50/70 p-3.5 rounded-2xl border border-purple-200/80 space-y-2">
@@ -631,7 +643,7 @@ export default function InventoryGrid({
                                 {/* Série Size Composition Badges */}
                                 <div className="flex flex-wrap gap-1.5 pt-1 dir-ltr" dir="ltr">
                                   {firstColorVars.map((v) => {
-                                    const compQty = v.serieComposition?.[v.size] || 1;
+                                    const compQty = getVariantSerieQty(v);
                                     return (
                                       <span
                                         key={v.id}
