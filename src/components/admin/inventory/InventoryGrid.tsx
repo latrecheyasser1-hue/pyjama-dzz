@@ -582,6 +582,18 @@ export default function InventoryGrid({
                                   </span>
                                 )}
                               </div>
+                            ) : activeStockTab === 'STORE' ? (
+                              <div className="flex items-center gap-2 flex-wrap">
+                                {(product.storePrice ?? product.sellingPrice) && Number(product.storePrice ?? product.sellingPrice) > 0 ? (
+                                  <span className="text-sm font-black text-amber-900 font-mono bg-amber-50 px-2.5 py-0.5 rounded-md border border-amber-200">
+                                    المحل: {product.storePrice ?? product.sellingPrice} د.ج
+                                  </span>
+                                ) : (
+                                  <span className="text-[11px] font-bold text-gray-500 font-mono bg-gray-100 px-2 py-0.5 rounded-md border border-gray-200">
+                                    سعر المحل غير محدد
+                                  </span>
+                                )}
+                              </div>
                             ) : (
                               <div className="flex items-center gap-2 flex-wrap">
                                 {product.sellingPrice && Number(product.sellingPrice) > 0 ? (
