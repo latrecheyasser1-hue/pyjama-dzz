@@ -347,14 +347,14 @@ export default function AddProductModal({
     if (!isOpen) return;
 
     if (productToEdit) {
-      setNameAr(productToEdit.nameAr || '');
-      setCategoryId(productToEdit.categoryId || '');
-      setSupplierName(productToEdit.supplierName || '');
-      setSupplierPhone(productToEdit.supplierPhone || '');
+      setNameAr(productToEdit.nameAr || (productToEdit as any).name || '');
+      setCategoryId(productToEdit.categoryId || (productToEdit as any).category_id || '');
+      setSupplierName(productToEdit.supplierName || (productToEdit as any).supplier_name || '');
+      setSupplierPhone(productToEdit.supplierPhone || (productToEdit as any).supplier_phone || '');
       setSku(productToEdit.sku || '');
-      setCostPrice(productToEdit.costPrice ?? '');
-      setSellingPrice(productToEdit.sellingPrice ?? '');
-      setOldPrice(productToEdit.oldPrice ?? '');
+      setCostPrice(productToEdit.costPrice ?? (productToEdit as any).cost_price ?? '');
+      setSellingPrice(productToEdit.sellingPrice ?? (productToEdit as any).selling_price ?? '');
+      setOldPrice(productToEdit.oldPrice ?? (productToEdit as any).old_price ?? '');
 
       // Unified bulk_price hydration from all potential DB aliases
       const bulkPriceVal =
@@ -365,10 +365,33 @@ export default function AddProductModal({
         '';
       setBulkDiscountPrice5(bulkPriceVal);
 
-      setWholesalePrice((productToEdit as any).wholesale_price ?? productToEdit.wholesalePrice ?? '');
-      setSuperGrosPrice((productToEdit as any).super_gros_price ?? productToEdit.superGrosPrice ?? '');
-      setMinWholesaleSeries((productToEdit as any).min_wholesale_series ?? productToEdit.minWholesaleSeries ?? 1);
-      setSuperGrosThreshold((productToEdit as any).super_gros_threshold ?? productToEdit.superGrosThreshold ?? 10);
+      const wsPriceVal =
+        (productToEdit as any).wholesale_price ??
+        (productToEdit as any).wholesalePrice ??
+        productToEdit.wholesalePrice ??
+        '';
+      setWholesalePrice(wsPriceVal !== null && wsPriceVal !== undefined ? String(wsPriceVal) : '');
+
+      const superGrosVal =
+        (productToEdit as any).super_gros_price ??
+        (productToEdit as any).superGrosPrice ??
+        productToEdit.superGrosPrice ??
+        '';
+      setSuperGrosPrice(superGrosVal !== null && superGrosVal !== undefined ? String(superGrosVal) : '');
+
+      const minSeriesVal =
+        (productToEdit as any).min_wholesale_series ??
+        (productToEdit as any).minWholesaleSeries ??
+        productToEdit.minWholesaleSeries ??
+        1;
+      setMinWholesaleSeries(minSeriesVal);
+
+      const superGrosThreshVal =
+        (productToEdit as any).super_gros_threshold ??
+        (productToEdit as any).superGrosThreshold ??
+        productToEdit.superGrosThreshold ??
+        10;
+      setSuperGrosThreshold(superGrosThreshVal);
       const rawDesc = productToEdit.description || '';
       const cleanDisplayDesc = rawDesc
         .replace(/<!--COLOR_IMAGES:[\s\S]*?-->/g, '')
@@ -1203,23 +1226,19 @@ export default function AddProductModal({
           variants: generatedVariants,
         };
 
-        if (activeWarehouse === 'DELIVERY' || activeWarehouse === 'STORE') {
-          updatedProdObj.supplierName = supplierName.trim() || undefined;
-          updatedProdObj.supplierPhone = supplierPhone.trim() || undefined;
-          updatedProdObj.sellingPrice = Number(sellingPrice) || 0;
-          updatedProdObj.oldPrice = oldPrice !== '' ? Number(oldPrice) : null;
-          updatedProdObj.bulkPrice = bVal;
-          updatedProdObj.bulk_price = bVal;
-          updatedProdObj.bulkDiscountPrice5 = bVal;
-        }
+        updatedProdObj.supplierName = supplierName.trim() || (productToEdit as any)?.supplier_name || productToEdit?.supplierName || undefined;
+        updatedProdObj.supplierPhone = supplierPhone.trim() || (productToEdit as any)?.supplier_phone || productToEdit?.supplierPhone || undefined;
+        updatedProdObj.sellingPrice = sellingPrice !== '' ? Number(sellingPrice) : ((productToEdit as any)?.selling_price ?? productToEdit?.sellingPrice ?? 0);
+        updatedProdObj.oldPrice = oldPrice !== '' ? Number(oldPrice) : ((productToEdit as any)?.old_price ?? productToEdit?.oldPrice ?? null);
+        updatedProdObj.bulkPrice = bVal ?? (productToEdit as any)?.bulk_price ?? productToEdit?.bulkPrice ?? null;
+        updatedProdObj.bulk_price = bVal ?? (productToEdit as any)?.bulk_price ?? productToEdit?.bulkPrice ?? null;
+        updatedProdObj.bulkDiscountPrice5 = bVal ?? productToEdit?.bulkDiscountPrice5;
 
-        if (activeWarehouse === 'WHOLESALE') {
-          updatedProdObj.wholesalePrice = wholesalePrice !== '' ? Number(wholesalePrice) : null;
-          updatedProdObj.superGrosPrice = superGrosPrice !== '' ? Number(superGrosPrice) : null;
-          updatedProdObj.unitsPerSerie = firstColorTotalItemsInSerie;
-          updatedProdObj.minWholesaleSeries = Number(minWholesaleSeries) || 1;
-          updatedProdObj.superGrosThreshold = Number(superGrosThreshold) || 10;
-        }
+        updatedProdObj.wholesalePrice = wholesalePrice !== '' ? Number(wholesalePrice) : ((productToEdit as any)?.wholesale_price ?? productToEdit?.wholesalePrice ?? null);
+        updatedProdObj.superGrosPrice = superGrosPrice !== '' ? Number(superGrosPrice) : ((productToEdit as any)?.super_gros_price ?? productToEdit?.superGrosPrice ?? null);
+        updatedProdObj.unitsPerSerie = firstColorTotalItemsInSerie || (productToEdit as any)?.units_per_serie || productToEdit?.unitsPerSerie || 4;
+        updatedProdObj.minWholesaleSeries = String(minWholesaleSeries) !== '' ? Number(minWholesaleSeries) : ((productToEdit as any)?.min_wholesale_series ?? productToEdit?.minWholesaleSeries ?? 1);
+        updatedProdObj.superGrosThreshold = String(superGrosThreshold) !== '' ? Number(superGrosThreshold) : ((productToEdit as any)?.super_gros_threshold ?? productToEdit?.superGrosThreshold ?? 10);
 
         if (onProductUpdated) {
           onProductUpdated(updatedProdObj);
