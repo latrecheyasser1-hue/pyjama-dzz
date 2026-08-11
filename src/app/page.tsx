@@ -346,7 +346,7 @@ export default function MasterAdminPage() {
                   deliveryStock: Number(v.delivery_stock) || 0,
                   storeStock: Number(v.store_stock) || 0,
                   wholesaleStock: Number(v.wholesale_stock) || 0,
-                  serieComposition: v.serie_composition || undefined,
+                  serieComposition: v.serie_composition || descMeta.serieCompositions?.[col] || descMeta.serieComposition || undefined,
                   wholesaleSeriesQty: v.wholesale_series_qty !== undefined ? Number(v.wholesale_series_qty) : undefined,
                 };
               })

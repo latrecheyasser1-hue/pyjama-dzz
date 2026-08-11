@@ -507,15 +507,43 @@ export default function AddProductModal({
           const wsStocks: Record<string, number> = {};
           const serieComp: Record<string, number> = {};
 
+          const derivedUnitsPerSize =
+            productToEdit.unitsPerSerie && vars.length > 0
+              ? Math.round(productToEdit.unitsPerSerie / vars.length)
+              : (productToEdit as any)?.units_per_serie && vars.length > 0
+              ? Math.round((productToEdit as any).units_per_serie / vars.length)
+              : descMeta.unitsPerSerie && vars.length > 0
+              ? Math.round(descMeta.unitsPerSerie / vars.length)
+              : undefined;
+
           vars.forEach((v) => {
             if (v.size) activeSizes.push(v.size);
             delStocks[v.size] = v.deliveryStock;
             storeStocks[v.size] = v.storeStock;
             wsStocks[v.size] = v.wholesaleStock;
-            if (v.serieComposition && typeof v.serieComposition === 'object') {
-              Object.assign(serieComp, v.serieComposition);
-            } else {
-              serieComp[v.size] = 2;
+
+            let sizePieceCount: number | undefined;
+            if (v.serieComposition && typeof v.serieComposition === 'object' && v.serieComposition[v.size] !== undefined) {
+              sizePieceCount = Number(v.serieComposition[v.size]);
+            } else if ((v as any).serie_composition && typeof (v as any).serie_composition === 'object' && (v as any).serie_composition[v.size] !== undefined) {
+              sizePieceCount = Number((v as any).serie_composition[v.size]);
+            } else if (descMeta.serieCompositions?.[colName]?.[v.size] !== undefined) {
+              sizePieceCount = Number(descMeta.serieCompositions[colName][v.size]);
+            } else if (descMeta.serieComposition?.[v.size] !== undefined) {
+              sizePieceCount = Number(descMeta.serieComposition[v.size]);
+            } else if (derivedUnitsPerSize && derivedUnitsPerSize > 0) {
+              sizePieceCount = derivedUnitsPerSize;
+            }
+
+            if (sizePieceCount !== undefined && !isNaN(sizePieceCount)) {
+              serieComp[v.size] = sizePieceCount;
+            }
+          });
+
+          // Ensure active sizes have an assigned serie piece count without forcing hardcoded default override
+          activeSizes.forEach((s) => {
+            if (serieComp[s] === undefined) {
+              serieComp[s] = derivedUnitsPerSize && derivedUnitsPerSize > 0 ? derivedUnitsPerSize : 2;
             }
           });
 
@@ -546,7 +574,7 @@ export default function AddProductModal({
             deliveryStocks: delStocks,
             storeStocks: storeStocks,
             wholesaleStocks: wsStocks,
-            serieComposition: Object.keys(serieComp).length > 0 ? serieComp : { S: 2, M: 2, L: 2, XL: 2 },
+            serieComposition: Object.keys(serieComp).length > 0 ? serieComp : (descMeta.serieComposition || { S: 2, M: 2, L: 2, XL: 2 }),
             activeSizes: activeSizes.length > 0 ? activeSizes : ['S', 'M', 'L', 'XL'],
           };
         });
@@ -1065,6 +1093,13 @@ export default function AddProductModal({
         .replace(/<!--COLOR_METADATA:[\s\S]*?-->/g, '')
         .trim();
 
+      const serieCompositionsMap: Record<string, Record<string, number>> = {};
+      sanitizedColors.forEach((c) => {
+        if (c.colorName.trim() && c.serieComposition) {
+          serieCompositionsMap[c.colorName.trim()] = c.serieComposition;
+        }
+      });
+
       const metaPayload = {
         images: colorImageMap,
         hexes: colorHexMap,
@@ -1074,6 +1109,8 @@ export default function AddProductModal({
         unitsPerSerie: firstColorTotalItemsInSerie,
         minWholesaleSeries: Number(minWholesaleSeries) || 1,
         superGrosThreshold: Number(superGrosThreshold) || 10,
+        serieComposition: sanitizedColors[0]?.serieComposition || null,
+        serieCompositions: serieCompositionsMap,
       };
       if (Object.keys(colorImageMap).length > 0 || Object.keys(colorHexMap).length > 0 || sizeCategory || wholesalePrice !== '') {
         finalDesc = `${finalDesc}\n<!--COLOR_METADATA:${JSON.stringify(metaPayload)}-->`.trim();
