@@ -365,10 +365,10 @@ export default function AddProductModal({
         '';
       setBulkDiscountPrice5(bulkPriceVal);
 
-      setWholesalePrice(productToEdit.wholesalePrice ?? '');
-      setSuperGrosPrice(productToEdit.superGrosPrice ?? '');
-      setMinWholesaleSeries(productToEdit.minWholesaleSeries ?? 1);
-      setSuperGrosThreshold(productToEdit.superGrosThreshold ?? 10);
+      setWholesalePrice((productToEdit as any).wholesale_price ?? productToEdit.wholesalePrice ?? '');
+      setSuperGrosPrice((productToEdit as any).super_gros_price ?? productToEdit.superGrosPrice ?? '');
+      setMinWholesaleSeries((productToEdit as any).min_wholesale_series ?? productToEdit.minWholesaleSeries ?? 1);
+      setSuperGrosThreshold((productToEdit as any).super_gros_threshold ?? productToEdit.superGrosThreshold ?? 10);
       const rawDesc = productToEdit.description || '';
       const cleanDisplayDesc = rawDesc
         .replace(/<!--COLOR_IMAGES:[\s\S]*?-->/g, '')
@@ -1089,22 +1089,18 @@ export default function AddProductModal({
 
       const bVal = bulkDiscountPrice5 !== '' && !isNaN(Number(bulkDiscountPrice5)) ? Number(bulkDiscountPrice5) : null;
 
-      if (activeWarehouse === 'DELIVERY' || activeWarehouse === 'STORE') {
-        productPayload.supplier_name = supplierName.trim() || null;
-        productPayload.supplier_phone = supplierPhone.trim() || null;
-        productPayload.selling_price = Number(sellingPrice) || 0;
-        productPayload.old_price = oldPrice !== '' ? Number(oldPrice) : null;
-        productPayload.bulk_price = bVal;
-        productPayload.bulk_discount_price_5 = bVal;
-      }
+      productPayload.supplier_name = supplierName.trim() || (isEditMode ? ((productToEdit as any)?.supplier_name ?? productToEdit?.supplierName ?? null) : null);
+      productPayload.supplier_phone = supplierPhone.trim() || (isEditMode ? ((productToEdit as any)?.supplier_phone ?? productToEdit?.supplierPhone ?? null) : null);
+      productPayload.selling_price = sellingPrice !== '' ? Number(sellingPrice) : (isEditMode ? ((productToEdit as any)?.selling_price ?? productToEdit?.sellingPrice ?? 0) : 0);
+      productPayload.old_price = oldPrice !== '' ? Number(oldPrice) : (isEditMode ? ((productToEdit as any)?.old_price ?? productToEdit?.oldPrice ?? null) : null);
+      productPayload.bulk_price = bVal ?? (isEditMode ? ((productToEdit as any)?.bulk_price ?? productToEdit?.bulkPrice ?? null) : null);
+      productPayload.bulk_discount_price_5 = bVal ?? (isEditMode ? ((productToEdit as any)?.bulk_discount_price_5 ?? productToEdit?.bulkDiscountPrice5 ?? null) : null);
 
-      if (activeWarehouse === 'WHOLESALE') {
-        productPayload.wholesale_price = wholesalePrice !== '' ? Number(wholesalePrice) : null;
-        productPayload.super_gros_price = superGrosPrice !== '' ? Number(superGrosPrice) : null;
-        productPayload.units_per_serie = firstColorTotalItemsInSerie;
-        productPayload.min_wholesale_series = Number(minWholesaleSeries) || 1;
-        productPayload.super_gros_threshold = Number(superGrosThreshold) || 10;
-      }
+      productPayload.wholesale_price = String(wholesalePrice) !== '' && wholesalePrice !== undefined && wholesalePrice !== null ? Number(wholesalePrice) : (isEditMode ? ((productToEdit as any)?.wholesale_price ?? productToEdit?.wholesalePrice ?? null) : null);
+      productPayload.super_gros_price = String(superGrosPrice) !== '' && superGrosPrice !== undefined && superGrosPrice !== null ? Number(superGrosPrice) : (isEditMode ? ((productToEdit as any)?.super_gros_price ?? productToEdit?.superGrosPrice ?? null) : null);
+      productPayload.units_per_serie = firstColorTotalItemsInSerie || (isEditMode ? ((productToEdit as any)?.units_per_serie ?? productToEdit?.unitsPerSerie ?? 4) : 4);
+      productPayload.min_wholesale_series = String(minWholesaleSeries) !== '' && minWholesaleSeries !== undefined && minWholesaleSeries !== null ? Number(minWholesaleSeries) : (isEditMode ? ((productToEdit as any)?.min_wholesale_series ?? productToEdit?.minWholesaleSeries ?? 1) : 1);
+      productPayload.super_gros_threshold = String(superGrosThreshold) !== '' && superGrosThreshold !== undefined && superGrosThreshold !== null ? Number(superGrosThreshold) : (isEditMode ? ((productToEdit as any)?.super_gros_threshold ?? productToEdit?.superGrosThreshold ?? 10) : 10);
 
       const selectedCat = categories.find((cat) => cat.id === categoryId);
       const generatedVariants: ProductVariant[] = [];

@@ -613,75 +613,61 @@ export default function InventoryGrid({
                       {activeStockTab === 'WHOLESALE' ? (
                         <div className="space-y-3 pt-3 border-t border-gray-100">
                           {/* Top Section: Standard Wholesale Série Composition Breakdown */}
-                          <div className="bg-purple-50/70 p-3.5 rounded-2xl border border-purple-200/80 space-y-2">
-                            <div className="flex items-center justify-between">
-                              <span className="text-xs font-black text-purple-900 flex items-center gap-1.5">
-                                <Layers className="w-3.5 h-3.5 text-purple-700" />
-                                <span>تكوين السيرية الواحدة (Série Bundle)</span>
-                              </span>
-                              <span className="text-[11px] font-mono font-black text-purple-800 bg-purple-100/90 px-2 py-0.5 rounded-md border border-purple-300/80">
-                                {product.unitsPerSerie || (Object.values(groupedColors)[0] || []).length || 4} قطعة / سيرية
-                              </span>
-                            </div>
+                          {(() => {
+                            const firstColorVars = sortVariantsAscending(Object.values(groupedColors)[0] || []);
+                            const actualUnitsPerSerie = firstColorVars.reduce((acc, v) => acc + (v.serieComposition?.[v.size] || 1), 0) || firstColorVars.length || 4;
 
-                            {/* Série Size Composition Badges */}
-                            <div className="flex flex-wrap gap-1.5 pt-1 dir-ltr" dir="ltr">
-                              {(() => {
-                                const firstColorVars = sortVariantsAscending(Object.values(groupedColors)[0] || []);
-                                return firstColorVars.map((v) => {
-                                  const compQty = v.serieComposition?.[v.size] || 1;
-                                  return (
-                                    <span
-                                      key={v.id}
-                                      className="px-2 py-1 rounded-xl bg-white text-purple-950 font-mono font-bold text-xs border border-purple-200 shadow-xs flex items-center gap-1"
-                                    >
-                                      <span className="font-extrabold">{v.size}</span>
-                                      <span className="text-purple-700 font-black">×{compQty}</span>
-                                    </span>
-                                  );
-                                });
-                              })()}
-                            </div>
-                          </div>
+                            return (
+                              <div className="bg-purple-50/70 p-3.5 rounded-2xl border border-purple-200/80 space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <span className="text-xs font-black text-purple-950 font-mono flex items-center gap-1.5" dir="ltr">
+                                    <span>Série :</span>
+                                  </span>
+                                  <span className="text-[11px] font-mono font-black text-purple-900 bg-purple-100/90 px-2.5 py-0.5 rounded-md border border-purple-300/80">
+                                    {actualUnitsPerSerie} قطعة / سيرية
+                                  </span>
+                                </div>
 
-                          {/* Bottom Section: Available Wholesale Colors */}
-                          <div className="bg-pyjama-cream/40 p-3.5 rounded-2xl border border-gray-200/80 space-y-2.5">
+                                {/* Série Size Composition Badges */}
+                                <div className="flex flex-wrap gap-1.5 pt-1 dir-ltr" dir="ltr">
+                                  {firstColorVars.map((v) => {
+                                    const compQty = v.serieComposition?.[v.size] || 1;
+                                    return (
+                                      <span
+                                        key={v.id}
+                                        className="px-2 py-1 rounded-xl bg-white text-purple-950 font-mono font-bold text-xs border border-purple-200 shadow-xs flex items-center gap-1"
+                                      >
+                                        <span className="font-extrabold">{v.size}</span>
+                                        <span className="text-purple-700 font-black">×{compQty}</span>
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            );
+                          })()}
+
+                          {/* Bottom Section: Minimalist Color Swatches (No Misleading Red Badges) */}
+                          <div className="bg-pyjama-cream/40 p-3 rounded-2xl border border-gray-200/80 space-y-2">
                             <h5 className="text-xs font-black text-gray-900">الألوان المتاحة للجملة:</h5>
 
-                            <div className="space-y-2">
+                            <div className="flex flex-wrap gap-2">
                               {Object.entries(groupedColors).map(([colorName, colorVars]) => {
                                 const hexColorVal = getColorHex(colorName, colorVars?.[0], product);
-                                const totalColorPieces = colorVars.reduce((sum, v) => sum + (v.wholesaleStock || 0), 0);
-                                const totalUnitsPerSerie = product.unitsPerSerie || colorVars.length || 1;
-                                const seriesAvailable = Math.floor(totalColorPieces / totalUnitsPerSerie);
 
                                 return (
                                   <div
                                     key={colorName}
-                                    className="flex items-center justify-between p-2.5 bg-white rounded-xl border border-gray-200 shadow-xs"
+                                    className="flex items-center gap-2 px-3 py-1.5 bg-white rounded-xl border border-gray-200 shadow-xs"
                                   >
-                                    <div className="flex items-center gap-2.5">
-                                      <span
-                                        className="w-5 h-5 rounded-full border border-gray-300 shadow-sm shrink-0"
-                                        style={{ backgroundColor: hexColorVal }}
-                                        title={`درجة اللون: ${colorName}`}
-                                      />
-                                      <span className="text-xs font-bold text-gray-900">
-                                        {colorName}
-                                      </span>
-                                    </div>
-
-                                    <div className="flex items-center gap-2">
-                                      <span
-                                        className={`px-2.5 py-1 rounded-lg text-xs font-mono font-black border ${
-                                          seriesAvailable > 0
-                                            ? 'bg-purple-50 text-purple-900 border-purple-200'
-                                            : 'bg-rose-50 text-rose-700 border-rose-200'
-                                        }`}
-                                      >
-                                        {seriesAvailable > 0 ? `${seriesAvailable} سيرية متوفرة` : 'غير متوفر بالجملة'}
-                                      </span>
-                                    </div>
+                                    <span
+                                      className="w-4 h-4 rounded-full border border-gray-300 shadow-xs shrink-0"
+                                      style={{ backgroundColor: hexColorVal }}
+                                      title={`درجة اللون: ${colorName}`}
+                                    />
+                                    <span className="text-xs font-bold text-gray-900 font-mono">
+                                      {colorName}
+                                    </span>
                                   </div>
                                 );
                               })}
